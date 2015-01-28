@@ -1,12 +1,14 @@
 ########################################################################
 # housekeeping
 ########################################################################
-package Net::AWS::Glacier::Treehash;
-use v5.12;
+package Net::AWS::Glacier::TreeHash;
+use v5.20;
 use autodie;
 
-use Scalar::Util    qw( blessed );
-use Digest::SHA     qw( sha256  );
+use Carp            qw( croak           );
+use Digest::SHA     qw( sha256          );
+use Scalar::Util    qw( blessed         );
+use Symbol          qw( qualify_to_ref  );
 
 ########################################################################
 # package variables
@@ -47,7 +49,7 @@ my $reduce_hash
         {
             sha256 splice @_, 0, 2
         }
-        ( 1 .. $count )
+        ( 1 .. $count );
 
         goto &$handler
     }
@@ -60,7 +62,7 @@ my $buffer_hash
     my $size    = length $buffer
     or return @_;
 
-    my $count   = $size / MiB;
+    my $count   = int( $size / MiB );
     ++$count if $size % MiB;
 
     $reduce_hash->
@@ -76,6 +78,19 @@ my $buffer_hash
 ########################################################################
 # methods
 ########################################################################
+
+sub import
+{
+    my $caller  = caller;
+
+    if( grep { ':tree_hash' eq $_ } @_ )
+    {
+        *{ qualify_to_ref 'tree_hash', $caller  } = \&tree_hash;
+    }
+
+    return
+}
+
 ########################################################################
 # construction
 
@@ -87,6 +102,8 @@ sub construct
 
 sub initialize
 {
+    my $t_hash  = shift;
+    @$t_hash    = ();
     return
 }
 
@@ -100,18 +117,19 @@ sub new
 ########################################################################
 # caller partitions the input, adds hashes to the object.
 
-sub single_hash
+sub tree_hash
 {
-    my ( undef, $buffer ) = @_;
+    blessed $_[0] 
+    and croak "Bogus tree_hash: this is not a method";
 
-    $buffer_hash->( $buffer )
+    $buffer_hash->( @_ )
 }
 
 sub part_hash
 {
     my ( $t_hash, $buffer ) = @_;
 
-    push @$t_hash, $buffer_hash->( $buffer );
+    push @$t_hash, $buffer_hash->( $buffer )
 }
 
 sub final_hash
@@ -120,50 +138,13 @@ sub final_hash
 
     @$t_hash    or croak 'Bogus final_hash: no part hashes available';
 
-    $reduce_hash->( @$buffer )
+    $reduce_hash->( @$t_hash )
 }
 
 # keep require happy
 1
 
 __END__
-
-## original code:
-##
-##sub _eat_data_one_mb
-##{
-##	my ($self, $dataref)  = @_;
-##	$self->{tree}->[0] ||= [];
-##	push @{ $self->{tree}->[0] }, { joined => 0, start => $self->{processed_size}, finish => $self->{processed_size}, hash => sha256($$dataref) };
-##	$self->{processed_size}++;
-##}
-##sub eat_file
-##{
-##	my ($self, $fh) = @_;
-##	while (1) {
-##		my $r = sysread($fh, my $data, $self->{unit});
-##		if (!defined($r)) {
-##			die;
-##		} elsif ($r > 0) {
-##			$self->_eat_data_one_mb(\$data);
-##		} else {
-##			return;
-##		}
-##	}
-##}
-##
-##sub eat_data
-##{
-##	my ($self, $dataref)  = @_;
-##	my $mb = $self->{unit};
-##	my $n = length($$dataref);
-##	my $i = 0;
-##	while ($i < $n) {
-##		my $part = substr($$dataref, $i, $mb);
-##		$self->_eat_data_one_mb(\$part);
-##		$i += $mb
-##	}
-##}
 
 =head1 SYNOPSIS
 
@@ -172,40 +153,47 @@ Glacier API (version 2012-06-01)
 
 Usage:
 
-	use Net::Amazon::TreeHash;
+	use Net::Amazon::TreeHash qw( :import );
 
-	my $th = Net::Amazon::TreeHash->new();
+    # simplest cases: compute the hash of a non-partitioned data.
 
-    # simplest cases: compute the hash of a single buffer or an 
-    # non-partitioned input.
-
-    my $t_hash  = $t_hash->single_hash( $buffer );
+    my $hash    = tree_hash( $buffer );
 
     # for multi-part uploads accumulate the partition hashses and
     # get a final one at the end.
 
-    my $t_hash  = $t_hash->part_hash( $buffer );
+	my $t_hash  = Net::Amazon::TreeHash->new();
 
-    for(;;)
+    while( my $part = next_chunk_of_data )
     {
-        my $part    = get_some_data;
 
         my $hash    = $t_hash->part_hash( $part );
 
-        send_partition
+        send_partition ... $hash ... $part;
     }
 
     my $total_hash  = $t_hash->final_hash;
 
+    send_final_message $total_hash;
+
+    # at this point either let $t_hash go out of scope 
+    # or call $t_hash->initialize to reset the list of
+    # partition hashes.
+
+=head1 DESCRIPTION
+
+Note: Perl-5.20 added internal Copy on Write semantics for strings.
+This obviates the need for pass-by-reference for the buffers: they
+are passed as strings with the internal COW mechanics minimizing 
+the overhead.
+
+
 
 =head1 SEE ALSO
 
-An application for AWS Glacier synchronization. 
-# It is available at L<https://github.com/vsespb/mt-aws-glacier>.
-
 =head1 AUTHOR
 
-Steven Lembark
+Steven Lembark <lembark@wrkhors.com>
 
 =head1 BUGS
 
