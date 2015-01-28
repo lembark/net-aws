@@ -10,7 +10,7 @@ use Digest::SHA     qw( sha256          );
 
 sub MiB()   { 2 ** 20 };
 
-my $madness = 'Net::AWS::Glacier::TreeHash';
+my $madness = 'Net::AWS::TreeHash';
 
 require_ok $madness ;
 $madness->import( ':tree_hash' );
