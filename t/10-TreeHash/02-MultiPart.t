@@ -43,3 +43,8 @@ for my $size ( 1, 4, 32, 128 )
 }
 
 done_testing;
+
+# this is not a module
+0
+
+__END__
