@@ -1,0 +1,15 @@
+#!/bin/bash
+
+cd $(dirname $0)/..;
+
+rm -f ./0*.t;
+
+find ../lib/ -name '*.pm'                           |
+perl -MList::Util=first -n                          \
+-e 'my @a = split /\W/; pop @a;'                    \
+-e 'my $i=first{ $a[$_] eq 'lib' } ( 0 .. $#a );'   \
+-e 'splice @a, 0, ++$i, "00";'                      \
+-e '$b = join "-", @a;'                             \
+-e 'symlink "bin/00-PM_t" => "$b.t"'                ;
+
+exit 0;

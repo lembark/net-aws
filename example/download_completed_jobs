@@ -1,0 +1,229 @@
+#!/bin/env perl
+########################################################################
+# housekeeping
+########################################################################
+use v5.20;
+use autodie;
+use FindBin::libs;
+
+use File::Basename  qw( basename        );
+use Symbol          qw( qualify_to_ref  );
+
+use Net::AWS::Glacier;
+
+########################################################################
+# package variables
+########################################################################
+
+my %seen    = ();
+
+my @credz
+= do
+{
+    my $server  = shift or die "Bogus $0: false location";
+    my $user    = shift or die "Bogus $0: false user key";
+    my $secret  = shift or die "Bogus $0: false secret";
+
+    ( $server, $user, $secret )
+};
+
+my $vault   = shift
+or die "Bogus $0: false vault name";
+
+$0  = join ' ' => basename( $0 ), 'download', $vault;
+
+my $signal  = '';
+my @sigz    = qw( INT TERM QUIT );
+
+@SIG{ @sigz }
+= do
+{
+    my $handler
+    = sub
+    {
+        # first one sets the flag, after that ignore them all.
+
+        @SIG{ @sigz } = ( 'IGNORE' ) x @sigz;
+        $signal = 1;
+    };
+
+    ( $handler ) x @sigz
+};
+
+$SIG{ HUP } = 'IGNORE';
+
+########################################################################
+# utility subs
+########################################################################
+
+for
+(
+    [ qw( has_complete_jobs     true    ) ],
+    [ qw( has_pending_jobs      false   ) ]
+)
+{
+    my ( $sub, $status ) = @$_;
+
+    my $ref = qualify_to_ref $sub;
+
+    my $handler
+    = sub
+    {
+        my ( $glacier, $name, $limit ) = @_;
+
+        # true for "onepass" argument.
+
+        my ( undef, $jobz ) 
+        = $glacier->chunk_list_jobs( $name, 0, $status, 1 );
+
+        # i.e., true if there is anything out there
+
+        scalar @$jobz
+    };
+
+    *{ $ref }   = \( $handler );
+}
+
+for
+(
+    [ qw( list_complete_jobs    true    ) ],
+    [ qw( list_pending_jobs     false   ) ]
+)
+{
+    my ( $name, $status ) = @$_;
+
+    my $ref = qualify_to_ref $name;
+
+    my $handler
+    = sub
+    {
+        my ( $glacier, $name, $limit ) = @_;
+
+        my @jobz    = ();
+
+        for( ;; )
+        {
+            # no "onepass" argument.
+
+            my ( $cont, $found ) 
+            = $glacier->chunk_list_jobs( $name, $limit, $status );
+
+            push @jobz, @$found;
+
+            $cont or last;
+        }
+
+        wantarray
+        ?  @jobz
+        : \@jobz
+    };
+
+    *{ $ref } = \( $handler );
+}
+
+
+my $download_complete
+= sub
+{
+    state $writerz = 
+    {
+        download    => $write_download_job,
+        inventory   => $write_inventory_job,
+    };
+
+    my ( $wrapper, $tag, $dest ) = @_;
+
+    my ( $name ) = $tag2name->( $tag );
+
+    my %seen    = ();
+
+    if( $dest )
+    {
+        $dest   .= '/';
+        make_path $dest;
+    }
+
+    my $jobz    = $wrapper->list_complete_jobs( $tag );
+
+    for( @$jobz )
+    {
+        my ( $job_id, $desc )
+        = @{ $_ }{ qw( JobId JobDescription ) };
+
+        my ( $type, $path ) = split /\s+/, $desc, 2;
+
+        my $writer = $writerz->{ $type }
+        or do
+        {
+            $syslog->
+            (
+                log_warning =>
+                "Unknown job type: '$type' ($desc)"
+            );
+
+            next
+        };
+
+        if( $seen{ $job_id } )
+        {
+            say "Duplicate jobid: '$job_id'";
+        }
+        else
+        {
+            say "# Process: '$path' ($job_id)"
+            if $verbose;
+
+            eval
+            {
+                # suffixing true dest with a '/' leaves
+                # $path untouched for empty dest.
+
+                $syslog->( log_info => "Download: '$type'" );
+
+                $wrapper->$writer
+                (
+                    $name => $job_id, $dest . $path
+                )
+                and 
+                $seen{ $job_id } = $path;
+            }
+            or 
+            $syslog->
+            (
+                log_warning =>
+                "Failed write: '$desc' $@ ($job_id)"
+            );
+        }
+    }
+
+    wantarray   // return;
+
+    wantarray
+    ?   values %seen
+    : [ values %seen ]
+};
+
+########################################################################
+# download content until nothing is pending
+########################################################################
+
+while( ! $signal )
+{
+    state $arch2path = {};
+    state $glacier
+    = eval
+    {
+        my @credz   = splice @ARGV, 0, 3;
+
+        Net::AWS::Glacier->new( @credz )
+    }
+    or die "Failed construct: $@";
+
+    for my $job ( $glacier->list_complete_jobs( $vault ) )
+    {
+        $signal or last;
+
+        my $path    = $job->{ JobDescript
+    }
+}
+

@@ -1,0 +1,27 @@
+#!/bin/env perl
+use v5.20;
+use autodie;
+
+use Net::AWS::Glacier;
+
+my $vault   = shift or die "Bogus $0: false vault name";
+my $aws_id  = shift or die "Bogus $0: false aws id";
+my $aws_key = shift or die "Bogus $0: false aws secret";
+my $path    = shift or die "Bogus $0: false path";
+my $desc    = shift;
+
+for( $path )
+{
+    -e      or die  "Non-existant: '$path'";
+    -r _    or die  "Un-readable: '$path'";
+    -s _    or warn "Empty: '$path'";
+}
+
+$0  = "upload '$vault' '$path'";
+
+Net::AWS::Glacier->new
+(
+    $vault,
+    $aws_id,
+    $aws_key
+)->upload_archive( $path, $desc );

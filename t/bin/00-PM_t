@@ -1,0 +1,49 @@
+########################################################################
+# housekeeping
+########################################################################
+
+package Naama;
+
+use v5.20;
+use autodie;
+use FindBin::libs;
+
+use File::Basename;
+use Test::More;
+
+use List::Util  qw( first );
+use Symbol      qw( qualify_to_ref );
+
+########################################################################
+# package variables
+########################################################################
+
+my @typz    = qw( SCALAR HASH ARRAY REGEXP CODE IO );
+
+########################################################################
+# run the tests
+########################################################################
+
+my $test_package
+= do
+{
+    my ( $base ) = ( basename $0, '.t' ) =~ m{ ^ \d+\D (.+) }x;
+
+    join '::' => split /\W/, $base; 
+};
+
+require_ok $test_package;
+
+SKIP:
+{
+    $test_package->can( 'VERSION' )
+    or skip "Module does not compile: $@" => 0;
+
+    pass "$test_package can 'VERSION'";
+
+    ok $test_package->VERSION, "$test_package has VERSION value";
+};
+
+done_testing
+
+__END__
