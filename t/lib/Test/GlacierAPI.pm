@@ -25,13 +25,13 @@ sub import
     {
         use_ok $package;
 
-        my $config  = "$etc/aws-config";
+        my $config  = "$etc/aws-config.gz";
 
         -e $config  or die "Non-existant: '$config";
         -s _        or die "Empty file: '$config";
         -r _        or die "Non-readable: '$config";
 
-        open my $fh, '<', $config;
+        open my $fh, '-|', "gzip -dc $config";
 
         chomp( my @linz = <$fh> );
 
