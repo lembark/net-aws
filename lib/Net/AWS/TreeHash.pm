@@ -4,6 +4,7 @@
 package Net::AWS::TreeHash;
 use v5.20;
 use autodie;
+use experimental qw( lexical_subs autoderef );
 
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
@@ -25,35 +26,28 @@ my $empty   = sha256 '';
 
 sub MiB() { 2 ** 20 };
 
-# iterate reducing the pairs of 1MiB data units into a single value.
-# "2 > @_" intentionally returns undef for an empty list.
-
-my $reduce_hash
-= do
+my sub reduce_hash
 {
-    my $handler = '';
+    # iterate reducing the pairs of 1MiB data units to a single value.
+    # "2 > @_" intentionally returns undef for an empty list.
 
-    $handler
-    = sub
+    return $_[0]
+    if 2 > @_;
+
+    # note that splice returns a single-entry list for the
+    # last iteration of an odd list.
+
+    my $count   = @_ / 2 + @_ % 2;
+
+    @_
+    = map
     {
-        return $_[0]
-        if 2 > @_;
-
-        # note that splice returns a single-entry list for the
-        # last iteration of an odd list.
-
-        my $count   = @_ / 2 + @_ % 2;
-
-        @_
-        = map
-        {
-            sha256 splice @_, 0, 2
-        }
-        ( 1 .. $count );
-
-        goto &$handler
+        sha256 splice @_, 0, 2
     }
-};
+    ( 1 .. $count );
+
+    goto &reduce_hash
+}
 
 my $buffer_hash
 = sub
@@ -65,7 +59,7 @@ my $buffer_hash
     my $count   = int( $size / MiB );
     ++$count if $size % MiB;
 
-    $reduce_hash->
+    reduce_hash
     (
         map
         {
@@ -138,7 +132,7 @@ sub final_hash
 
     @$t_hash    or croak 'Bogus final_hash: no part hashes available';
 
-    $reduce_hash->( @$t_hash )
+    reduce_hash @$t_hash
 }
 
 # keep require happy
