@@ -16,12 +16,12 @@ SKIP:
     use Net::AWS::TreeHash qw( :tree_hash :reduce_hash );
 
     my $size    = 128 * MiB;
-    my $count   = 8192;
+    my $count   = 1024;
     my $total   = $size * $count;
 
-    # i.e., 1TiB == 1_099_511_627_776 bytes total.
+    # i.e., 137_438_953_472 == 128GiB total.
     # each 128MiB buffer has 256 sha256 hash values computed.
-    # result is 2_080_768 sha256 calc's to process the total input.
+    # result is 262_144 sha256 calc's to process the total input.
 
     note 
     "This is basically a test for memory leaks processing large files";
