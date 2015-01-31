@@ -20,6 +20,8 @@ use Symbol          qw( qualify_to_ref          );
 ########################################################################
 
 our $VERSION    = '0.01';
+$VERSION        = eval $VERSION;
+
 our @CARP_NOT   = ();
 
 my $verbose = '';
