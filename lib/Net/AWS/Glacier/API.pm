@@ -12,7 +12,7 @@ use LWP::UserAgent;
 use POSIX;
 
 use Net::Amazon::Signature::V4;
-use Net::Amazon::TreeHash;
+use Net::Amazon::TreeHash       qw( :tree_hash );
 
 use Carp            qw( carp croak                          );
 use List::Util      qw( first                               );
@@ -721,8 +721,6 @@ sub multipart_upload_init
     my $name    = shift or croak "false vault name";
     my $size    = shift or croak "false partition size";
     my $desc    = $sanitize_description->( @_, $name );
-
-	my $multipart_upload_id;
 
     $api->$send_request
     (
