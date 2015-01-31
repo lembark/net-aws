@@ -19,3 +19,6 @@ nytprof.out
 *.bs
 .prove
 *~
+?
+!t
+t/00-*
