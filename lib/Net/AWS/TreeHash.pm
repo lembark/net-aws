@@ -4,7 +4,6 @@
 package Net::AWS::TreeHash;
 use v5.20;
 use autodie;
-use experimental qw( lexical_subs autoderef );
 
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
@@ -29,14 +28,13 @@ sub MiB() { 2 ** 20 };
 my $reduce_hash
 = do
 {
-    my $handler = '';
+    my $handler  = '';
 
     $handler
     = sub
     {
-        # iterate reducing the pairs of 1MiB data units to 
-        # a single value.  "2 > @_" intentionally returns 
-        # undef for an empty list.
+        # iterate reducing the pairs of 1MiB data units to a single value.
+        # "2 > @_" intentionally returns undef for an empty list.
 
         return $_[0]
         if 2 > @_;
@@ -90,6 +88,13 @@ sub import
         *{ qualify_to_ref 'tree_hash', $caller  } = \&tree_hash;
     }
 
+    if( grep { ':reduce_hash' eq $_ } @_ )
+    {
+        # mainly for testing.
+
+        *{ qualify_to_ref 'reduce_hash', $caller  } = $reduce_hash;
+    }
+
     return
 }
 
@@ -121,8 +126,7 @@ sub new
 
 sub tree_hash
 {
-    blessed $_[0] 
-    and croak "Bogus tree_hash: this is not a method";
+    blessed $_[0] and shift;
 
     $buffer_hash->( @_ )
 }

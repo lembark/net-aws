@@ -17,13 +17,13 @@ $madness->import( ':tree_hash' );
 
 ok __PACKAGE__->can( 'tree_hash' ), "'tree_hash' installed";
 
-for my $length ( 1, 1024, 4096, MiB )
+for my $length ( 1, 1024, 4096, MiB, 32 * MiB, 128 * MiB )
 {
     my $buffer  = ' ' x $length;
     my $expect  = sha256 $buffer;
     my $found   = tree_hash( $buffer );
 
-    ok $found == $expect, "Hashed one $length x spaces";
+    ok $found == $expect, "Hashed $length buffer";
 }
 
 my $chunk1  = 'a' x MiB;
