@@ -1,10 +1,11 @@
 package Net::AWS::Glacier::Test;
-
 use v5.20;
 use autodie;
 use FindBin::libs;
 
 use Test::More;
+
+use Benchmark   qw( :hireswallclock );
 
 SKIP:
 {
@@ -23,7 +24,7 @@ SKIP:
     # each 128MiB buffer has 256 sha256 hash values computed.
     # result is 262_144 sha256 calc's to process the total input.
 
-    note 
+    note
     "This is basically a test for memory leaks processing large files";
 
     note "Buffer: $size";
@@ -37,16 +38,35 @@ SKIP:
 
     for my $i ( 1 .. $count )
     {
+        my $t0  = Benchmark->new;
+
         my $j   = $t_hash->part_hash( $buffer );
+
+        my $t1  = Benchmark->new;
+        my $dt  = timediff $t1, $t0;
+        my $str = timestr $dt;
+
+        note "Pass: $i ($str)";
 
         my $expect  = tree_hash $buffer;
         my $found   = $t_hash->[-1];
-         
-        $i == $j            
-        or do { fail "Miscount: $i != $j";      last };
 
-        $expect == $found   
-        or do { fail "Botched tree_hash: $i";   last };
+        $i == $j
+        or do
+        {
+            fail "Miscount: $i != $j";
+            last
+        };
+
+        $expect == $found
+        or do
+        {
+            my $e   = sprintf '%X', $expect;
+            my $f   = sprintf '%X', $found;
+
+            fail "Botched tree_hash: $i ($f != $e)";
+            last
+        };
     }
     continue
     {
