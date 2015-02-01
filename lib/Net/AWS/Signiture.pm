@@ -2,9 +2,9 @@
 # housekeeping
 ########################################################################
 package Net::AWS::Signiture;
-use experimental qw( lexical_subs );
 use v5.20;
 use autodie;
+use experimental qw( lexical_subs );
 
 use Carp            qw( croak                                   );
 use Digest::SHA     qw( sha256_hex hmac_sha256 hmac_sha256_hex  );
@@ -34,9 +34,9 @@ $DB::single = 1;
 
     my $req     = shift;
 	my $date    = $req->header( 'Date' );
-    my $is_iso  = $date =~ m{^ \d{8} T \d{6}Z $}x;
+    my $is_iso  = $date =~ m{^ \d{8} T \d{6} Z $}x;
 
-    my $str_format
+    my $stp_format
     = $is_iso
     ? '%Y%m%dT%H%M%SZ'          # ISO 8601
     : '%d %b %Y %H:%M:%S %Z'    # AWS4 test suite
@@ -48,17 +48,26 @@ $DB::single = 1;
     substr $date, 0, 4, '' 
     if ! $is_iso;
 
-    strptime $str_format => $date
+    strptime $stp_format => $date
 };
 
-my $c_path 
-= sub
+my sub c_hash
+{
+$DB::single = 1;
+
+    state $field= 'x-amz-content-sha256';
+
+    my $req     = shift;
+
+    $req->header( $field) || sha256_hex( $req->content );
+}
+
+my sub c_path 
 {
 $DB::single = 1;
 
     my $req     = shift;
-    my $uri     = $req->uri;
-    my $path    = $uri->path;
+    my $path    = $req->uri->path;
 
     for( $path )
     {
@@ -74,13 +83,13 @@ $DB::single = 1;
     }
 
     $path
-};
+}
 
-my $c_query
-= sub
+my sub c_query
 {
+$DB::single = 1;
+
     my $req     = shift;
-    my $uri     = $req->uri;
 
     join '&' =>
     map
@@ -101,12 +110,13 @@ my $c_query
 
         [ lc $key, $val ]
     }
-    split '&', $uri->query
-};
+    split '&', $req->uri->query
+}
 
-my $sign_heads
-= sub
+my sub sign_heads
 {
+$DB::single = 1;
+
     my $req     = shift;
 
     join ';' =>
@@ -119,21 +129,9 @@ my $sign_heads
         lc
     }
     $req->headers->header_field_names
-};
+}
 
-my $c_hash
-= sub
-{
-$DB::single = 1;
-
-    state $head = 'x-amz-content-sha256';
-    my $req     = shift;
-
-    $req->header( $head ) || sha256_hex( $req->content );
-};
-
-my $c_header
-= sub
+my sub c_heads
 {
 $DB::single = 1;
 
@@ -165,19 +163,20 @@ $DB::single = 1;
         lc
     }
     $head->header_field_names
-};
+}
 
-my $canonical_hash
-= sub
+my sub canonical_hash
 {
+$DB::single = 1;
+
     my $req     = shift;
 
     my $method  = $req->method;
-    my $path    = $req->$c_path;
-    my $query   = $req->$c_query;
-    my $hash    = $req->$c_hash;
-    my $c_heads = $req->$c_header;
-    my $s_heads = $req->$sign_heads;
+    my $path    = $req->c_path;
+    my $query   = $req->c_query;
+    my $hash    = $req->c_hash;
+    my $c_heads = $req->c_heads;
+    my $s_heads = $req->sign_heads;
 
     my $c_string
     = join "\n" =>
@@ -191,11 +190,12 @@ my $canonical_hash
     );
 
     sha256_hex $c_string
-};
+}
 
-my $sig_scope
-= sub
+my sub sig_scope
 {
+$DB::single = 1;
+
     state $type = 'aws4_request';
 
     my ( $sig, $req ) = @_;
@@ -203,29 +203,31 @@ my $sig_scope
     my $date    = $req->datetime->strftime( '%Y%m%d' );
 
 	join '/' => $date, @{ $sig }{ qw( endpoint service ) }, $type
-};
+}
 
-my $string_to_sign
-= sub
+my sub string_to_sign
 {
+$DB::single = 1;
+
     state $iso_fmt  = '%Y%m%dT%H%M%SZ';
 
     my $req     = shift;
-    my $date    = $req->$datetime->strftime( $iso_fmt );
-    my $hash    = $req->$canonical_hash;
+    my $date    = $req->datetime->strftime( $iso_fmt );
+    my $hash    = $req->canonical_hash;
 
-    my $scope   = &$sig_scope;
+    my $scope   = &sig_scope;
 
     join "\n" =>
     ALGORITHM,
     $date,
     $scope,
     $hash
-};
+}
 
-my $authz
-= sub
+my sub authz
 {
+$DB::single = 1;
+
     my $cred_tag    = 'aws4_request';
 
     my ( $sig, $req ) = @_;
@@ -235,9 +237,9 @@ my $authz
     my $serv    = $sig->{ service   };
     my $key     = $sig->{ key       };
 
-    my $ymd         = $req->$datetime->strftime( '%Y%m%d' );
-    my $sign_this   = $req->$string_to_sign;
-    my $authz_head  = $req->$sign_heads;
+    my $ymd         = $req->datetime->strftime( '%Y%m%d' );
+    my $sign_this   = $req->string_to_sign;
+    my $authz_head  = $req->sign_heads;
 
     my $authz_cred  = join '/', $key, $ymd, $endpt, $serv, $cred_tag;
 
@@ -257,7 +259,7 @@ my $authz
     "Credential=$authz_cred",
     "SignedHeaders=$authz_head",
     "Signiture=$authz_sig"
-};
+}
 
 ########################################################################
 # methods
@@ -300,7 +302,7 @@ sub sign
     my $req     = shift
     or croak "Bogus sign: false request";
 
-    my $value   = $sig->$authz( $req );
+    my $value   = $sig->authz( $req );
 
     $req->header( Authorization => $value );
 
