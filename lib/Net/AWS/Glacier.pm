@@ -358,12 +358,6 @@ sub download_all_jobs
 ########################################################################
 # archive and upload management
 
-my $upload_path
-= sub
-{
-    my $[
-};
-
 sub upload_paths
 {
     my $glacier = shift;
@@ -371,7 +365,7 @@ sub upload_paths
 
     @_  or return;
 
-    my @path2arch   = ();
+    my %path2arch   = ();
 
     for( @_ )
     {
@@ -383,8 +377,7 @@ sub upload_paths
 
         $desc   ||= $path;
 
-        push 
-        $path2arch{ $path }
+        $path2arch{ $path } 
         = eval
         {
             -e $path    or die "Non-existant: '$path'\n";

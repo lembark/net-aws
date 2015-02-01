@@ -517,14 +517,6 @@ for
             DELETE
             notification-configuration
         )
-    ],
-    [
-        $execute_request,
-        qw
-        (
-            delete_vault_notifications
-            DELETE
-        )
     ]
 )
 {
