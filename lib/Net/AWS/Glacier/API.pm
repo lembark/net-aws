@@ -538,6 +538,8 @@ for
 
 sub list_vaults
 {
+$DB::single = 1;
+
     local @CARP_NOT = ( __PACKAGE__ );
 
     my $api = shift;
