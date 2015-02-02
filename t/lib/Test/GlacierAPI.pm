@@ -17,8 +17,6 @@ use Symbol      qw( qualify_to_ref );
 
 sub import
 {
-$DB::single = 1;
-
     shift;
 
     state $package  = 'Net::AWS::Glacier::API';
@@ -27,7 +25,7 @@ $DB::single = 1;
     {
         use_ok $package;
 
-        my $config  = "$etc/aws-config";
+        my $config  = "$etc/test.conf";
 
         -e $config  or die "Non-existant: '$config";
         -s _        or die "Empty file: '$config";

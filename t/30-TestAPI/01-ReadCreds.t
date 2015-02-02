@@ -4,17 +4,25 @@ use FindBin::libs   qw( base=etc export scalar );
 
 use Test::More;
 
+my $path    = "$etc/test.conf";
+
+-e $path    or BAIL_OUT "Non-existant: '$path'";
+-r _        or BAIL_OUT "Non-readable: '$path'";
+-s _        or BAIL_OUT "Zero-size:    '$path'";
+
 my ( $region, $user, $secret )
 = do
 {
-    open my $fh, '<', "$etc/aws-config";
+    open my $fh, '<', $path;
     chomp( my @linz = <$fh> );
 
     @linz
 };
 
-ok $region, "Read region";
-ok $user,   "Read user";
-ok $secret, "Read secret";
+$region     or BAIL_OUT "$path missing region";     
+$user       or BAIL_OUT "$path missing user";     
+$secret     or BAIL_OUT "$path missing secret";     
+
+pass "Config file: $path";
 
 done_testing;
