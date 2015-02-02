@@ -17,6 +17,8 @@ use Symbol      qw( qualify_to_ref );
 
 sub import
 {
+$DB::single = 1;
+
     shift;
 
     state $package  = 'Net::AWS::Glacier::API';
@@ -36,14 +38,18 @@ sub import
         {
             open my $fh, '<', $config;
 
-            my $text    = do { local $/; readline $fh };
+            chomp( my @a = readline $fh );
 
-            $text   =~ s{^ \s* # .* }{}gmx;
-
-            split /\n+/, $text;
+            @a
         };
 
         3 == @linz or die "Bogus config: line count != 3";
+
+        $linz[1]    =~ s{^ AWSAccessKeyId=  }{}x
+        or die 'Config missing AWSAccessKeyId';
+
+        $linz[2]    =~ s{^ AWSSecretKey=    }{}x
+        or die 'Config missing AWSSecretKey';
 
        \@linz
     };

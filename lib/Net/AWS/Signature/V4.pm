@@ -290,7 +290,7 @@ sub new
 ########################################################################
 # sign a message
 
-sub signed
+sub sign
 {
     my $sig     = shift;
     my $req     = shift

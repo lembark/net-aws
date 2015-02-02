@@ -23,6 +23,12 @@ $region     or BAIL_OUT "$path missing region";
 $user       or BAIL_OUT "$path missing user";     
 $secret     or BAIL_OUT "$path missing secret";     
 
+index $user,    'AWSAccessKeyId='
+and BAIL_OUT "user lacks 'AWSAccessKeyId='";
+
+index $secret,  'AWSSecretKey='
+and BAIL_OUT "secret lacks 'AWSAccessKeyId='";
+
 pass "Config file: $path";
 
 done_testing;
