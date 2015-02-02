@@ -24,9 +24,10 @@ my $empty   = sha256 '';
 # utility subs
 ########################################################################
 
-sub MiB() { 2 ** 20 };
+my sub MiB() { 2 ** 20 };
 
-my sub reduce_hash
+my $reduce_hash
+= sub
 {
     # iterate reducing the pairs of 1MiB data units to a single value.
     # "2 > @_" intentionally returns undef for an empty list.
@@ -37,34 +38,33 @@ my sub reduce_hash
     # note that splice returns a single-entry list for the
     # last iteration of an odd list.
 
-    my $count  => @_ / 2 + @_ % 2;
+    my $chunks  = ( @_ / 2 ) + ( @_ % 2 );
 
     @_
     = map
     {
         sha256 splice @_, 0, 2
     }
-    ( 1 .. $count );
+    ( 1 .. $chunks );
 
     goto __SUB__
-}
+};
 
 my sub buffer_hash
 {
+    state $format   = '(a' . MiB . ')*';
+
     my $buffer  = shift;
     my $size    = length $buffer
     or return @_;
 
-    my $count   = int( $size / MiB );
-    ++$count if $size % MiB;
-
-    reduce_hash
+    $reduce_hash->
     (
         map
         {
-            sha256 substr $buffer, 0, MiB, ''
+            sha256 $_
         }
-        ( 1 .. $count )
+        unpack $format, $buffer
     )
 }
 
@@ -85,7 +85,7 @@ sub import
     {
         # mainly for testing.
 
-        *{ qualify_to_ref 'reduce_hash', $caller  } = \&reduce_hash;
+        *{ qualify_to_ref 'reduce_hash', $caller  } = $reduce_hash;
     }
 
     return
@@ -137,7 +137,7 @@ sub final_hash
 
     @$t_hash    or croak 'Bogus final_hash: no part hashes available';
 
-    reduce_hash @$t_hash
+    $reduce_hash->( @$t_hash )
 }
 
 # keep require happy
