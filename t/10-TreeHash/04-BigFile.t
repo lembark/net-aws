@@ -22,6 +22,9 @@ my $expensive   = $ENV{ EXPENSIVE_TESTS };
 my $count
 = do
 {
+    # add a blank line to keep the rest of this left-justified.
+    diag '';
+
     if( $expensive )
     {
         # i.e., roughly 1/2 TB.
@@ -37,7 +40,6 @@ my $count
     {
         diag "Using small buffer count to test memory footprint.";
         diag "For more effecive, if longer, test set EXPENSEIVE_TESTS";
-        diag "Expected runtime: ~20 minutes";
 
         32
     }
@@ -45,7 +47,22 @@ my $count
 
 my $size    = 128 * MiB;
 my $total   = $size * $count;
-my $time    = 30 + $count;
+
+diag 
+do
+{
+    # give the poor slobs who picked EXPENSIVE_TESTS some idea
+    # of what they are in for...
+
+    my $t0  = Benchmark->new;
+    tree_hash ' ' x $size;
+    my $t1  = Benchmark->new;
+
+    my $sec = 2 * $count * ( $t1->[0] - $t0->[0] );
+    my $est = 1 + int $sec;
+
+    "Est. runtime: $est sec"
+};
 
 ########################################################################
 # package variables
@@ -56,7 +73,6 @@ note "This is basically a test for memory leaks processing large files";
 note "Buffer:  $size";
 note "Cycles:  $count";
 note "Input:   $total";
-diag "Runtime: $time sec";
 
 my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
 my $buffer  = "\c@" x $size;
@@ -80,7 +96,6 @@ for my $i ( 1 .. $count )
     my $str = timestr $dt;
 
     note "Pass: $i ($str)";
-
     my $expect  = tree_hash $buffer;
     my $found   = $t_hash->[-1];
 
