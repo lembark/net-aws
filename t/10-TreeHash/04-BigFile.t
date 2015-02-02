@@ -45,7 +45,7 @@ my $count
 
 my $size    = 128 * MiB;
 my $total   = $size * $count;
-my $time    = 30 + $count;
+my $time    = 2 * $count;
 
 ########################################################################
 # package variables
