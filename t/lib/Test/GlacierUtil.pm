@@ -15,37 +15,28 @@ use Symbol      qw( qualify_to_ref );
 # package variables
 ########################################################################
 
+state $madness  = 'Net::AWS::Glacier';
+
+########################################################################
+# utility subs
+########################################################################
+
 sub import
 {
     shift;
 
-    state $package  = 'Net::AWS::Glacier::Util';
-    state $credz
-    = do
-    {
-        use_ok $package;
+    require Test::GlacierAPI;
 
-        my $config  = "$etc/aws-config";
+    my  @credz  = eval { Test::GlacierAPI->read_creds }
+    or BAIL_OUT "Unable to read credentials ($@)";
 
-        -e $config  or die "Non-existant: '$config";
-        -s _        or die "Empty file: '$config";
-        -r _        or die "Non-readable: '$config";
-
-        open my $fh, '<', $config;
-
-        chomp( my @linz = <$fh> );
-
-        3 == @linz or die "Bogus config: line count != 3";
-
-       \@linz
-    };
+    use_ok $madness;
 
     my $caller  = caller;
 
-    diag "Install: API object -> $caller";
+    diag "Install: Util object -> $caller";
 
-    *{ qualify_to_ref glacier => $caller }
-    = \( $package->new( @$credz ) );
+    *{ qualify_to_ref glacier => $caller } = \( $madness->new( @credz ) );
 
     return
 }

@@ -15,51 +15,51 @@ use Symbol      qw( qualify_to_ref );
 # package variables
 ########################################################################
 
-sub import
+my $madness = 'Net::AWS::Glacier::API';
+
+########################################################################
+# utility subs
+########################################################################
+
+sub read_creds
 {
-$DB::single = 1;
+    my $config  = "$etc/test.conf";
 
-    shift;
+    -e $config  or die "Non-existant: '$config";
+    -s _        or die "Empty file: '$config";
+    -r _        or die "Non-readable: '$config";
 
-    state $package  = 'Net::AWS::Glacier::API';
-    state $credz
+    my @linz
     = do
     {
-        use_ok $package;
+        open my $fh, '<', $config;
 
-        my $config  = "$etc/test.conf";
+        my $text    = do { local $/; readline $fh };
 
-        -e $config  or die "Non-existant: '$config";
-        -s _        or die "Empty file: '$config";
-        -r _        or die "Non-readable: '$config";
+        $text   =~ s{^ \s* # .* }{}gmx;
 
-        my @linz
-        = do
-        {
-            open my $fh, '<', $config;
-
-            chomp( my @a = readline $fh );
-
-            @a
-        };
-
-        3 == @linz or die "Bogus config: line count != 3";
-
-        $linz[1]    =~ s{^ AWSAccessKeyId=  }{}x
-        or die 'Config missing AWSAccessKeyId';
-
-        $linz[2]    =~ s{^ AWSSecretKey=    }{}x
-        or die 'Config missing AWSSecretKey';
-
-       \@linz
+        split /\n+/, $text;
     };
+
+    3 == @linz or die "Bogus config: line count != 3";
+
+    wantarray
+    ?  @linz
+    : \@linz
+}
+
+sub import
+{
+    shift;
+
+    use_ok $madness;
+    state $credz    = read_creds;
 
     my $caller  = caller;
 
     diag "Install: API object -> $caller";
 
-    *{ qualify_to_ref glacier => $caller }
-    = \( $package->new( @$credz ) );
+    *{ qualify_to_ref glacier => $caller } = \( $madness->new( @$credz ) );
 
     return
 }
