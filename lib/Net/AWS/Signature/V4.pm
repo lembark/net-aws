@@ -1,7 +1,7 @@
 ########################################################################
 # housekeeping
 ########################################################################
-package Net::AWS::Signiture;
+package Net::AWS::Signature::V4;
 use v5.20;
 use autodie;
 use experimental qw( lexical_subs );
@@ -10,6 +10,8 @@ use Carp            qw( croak                                   );
 use Digest::SHA     qw( sha256_hex hmac_sha256 hmac_sha256_hex  );
 use List::Util      qw( reduce                                  );
 use Scalar::Util    qw( blessed                                 );
+
+use DateTime::Format::Strptime qw( strptime );
 
 ########################################################################
 # package variables
@@ -30,8 +32,6 @@ sub ALGORITHM() { 'AWS4-HMAC-SHA256' }
 my $datetime
 = sub
 {
-$DB::single = 1;
-
     my $req     = shift;
 	my $date    = $req->header( 'Date' );
     my $is_iso  = $date =~ m{^ \d{8} T \d{6} Z $}x;
@@ -51,21 +51,19 @@ $DB::single = 1;
     strptime $stp_format => $date
 };
 
-my sub c_hash
+my $c_hash
+= sub
 {
-$DB::single = 1;
-
     state $field= 'x-amz-content-sha256';
 
     my $req     = shift;
 
     $req->header( $field) || sha256_hex( $req->content );
-}
+};
 
-my sub c_path 
+my $c_path 
+= sub
 {
-$DB::single = 1;
-
     my $req     = shift;
     my $path    = $req->uri->path;
 
@@ -83,12 +81,11 @@ $DB::single = 1;
     }
 
     $path
-}
+};
 
-my sub c_query
+my $c_query
+= sub
 {
-$DB::single = 1;
-
     my $req     = shift;
 
     join '&' =>
@@ -111,12 +108,11 @@ $DB::single = 1;
         [ lc $key, $val ]
     }
     split '&', $req->uri->query
-}
+};
 
-my sub sign_heads
+my $sign_heads
+= sub
 {
-$DB::single = 1;
-
     my $req     = shift;
 
     join ';' =>
@@ -129,17 +125,16 @@ $DB::single = 1;
         lc
     }
     $req->headers->header_field_names
-}
+};
 
-my sub c_heads
+my $c_heads
+= sub
 {
-$DB::single = 1;
-
     my $req     = shift;
     my $head    = $req->headers;
 
-    join "\n" =>
-    map
+    my @headz
+    = map
     {
         my $field   = $_;
         my @valz    = $head->header( $field );
@@ -162,21 +157,22 @@ $DB::single = 1;
     {
         lc
     }
-    $head->header_field_names
-}
+    $head->header_field_names;
 
-my sub canonical_hash
+    join "\n" => @headz, ''
+};
+
+my $canonical_hash
+= sub
 {
-$DB::single = 1;
-
     my $req     = shift;
 
     my $method  = $req->method;
-    my $path    = $req->c_path;
-    my $query   = $req->c_query;
-    my $hash    = $req->c_hash;
-    my $c_heads = $req->c_heads;
-    my $s_heads = $req->sign_heads;
+    my $path    = $req->$c_path;
+    my $query   = $req->$c_query;
+    my $hash    = $req->$c_hash;
+    my $c_head  = $req->$c_heads;
+    my $s_head  = $req->$sign_heads;
 
     my $c_string
     = join "\n" =>
@@ -184,51 +180,49 @@ $DB::single = 1;
         $method,
         $path,
         $query,
-        $c_heads,
-        $s_heads,
+        $c_head,
+        $s_head,
         $hash
     );
 
     sha256_hex $c_string
-}
+};
 
-my sub sig_scope
+my $sig_scope
+= sub
 {
-$DB::single = 1;
-
     state $type = 'aws4_request';
 
     my ( $sig, $req ) = @_;
 
-    my $date    = $req->datetime->strftime( '%Y%m%d' );
+    my $date    = $req->$datetime->strftime( '%Y%m%d' );
 
 	join '/' => $date, @{ $sig }{ qw( endpoint service ) }, $type
-}
+};
 
-my sub string_to_sign
+my $string_to_sign
+= sub
 {
-$DB::single = 1;
-
     state $iso_fmt  = '%Y%m%dT%H%M%SZ';
 
-    my $req     = shift;
-    my $date    = $req->datetime->strftime( $iso_fmt );
-    my $hash    = $req->canonical_hash;
+    my ( $sig, $req ) = @_;
 
-    my $scope   = &sig_scope;
+    my $date    = $req->$datetime->strftime( $iso_fmt );
+    my $hash    = $req->$canonical_hash;
+
+    my $scope   = $sig->$sig_scope( $req );
 
     join "\n" =>
     ALGORITHM,
     $date,
     $scope,
     $hash
-}
+};
 
-my sub authz
+my $authz
+= sub
 {
-$DB::single = 1;
-
-    my $cred_tag    = 'aws4_request';
+    state $cred_tag = 'aws4_request';
 
     my ( $sig, $req ) = @_;
 
@@ -237,9 +231,10 @@ $DB::single = 1;
     my $serv    = $sig->{ service   };
     my $key     = $sig->{ key       };
 
-    my $ymd         = $req->datetime->strftime( '%Y%m%d' );
-    my $sign_this   = $req->string_to_sign;
-    my $authz_head  = $req->sign_heads;
+    my $ymd         = $req->$datetime->strftime( '%Y%m%d' );
+    my $authz_head  = $req->$sign_heads;
+
+    my $sign_this   = $sig->$string_to_sign( $req );
 
     my $authz_cred  = join '/', $key, $ymd, $endpt, $serv, $cred_tag;
 
@@ -258,8 +253,8 @@ $DB::single = 1;
     ALGORITHM,
     "Credential=$authz_cred",
     "SignedHeaders=$authz_head",
-    "Signiture=$authz_sig"
-}
+    "Signature=$authz_sig"
+};
 
 ########################################################################
 # methods
@@ -295,19 +290,17 @@ sub new
 ########################################################################
 # sign a message
 
-sub sign
+sub signed
 {
-$DB::single = 1;
-
     my $sig     = shift;
     my $req     = shift
     or croak "Bogus sign: false request";
 
-    my $value   = $sig->authz( $req );
+    my $value   = $sig->$authz( $req );
 
     $req->header( Authorization => $value );
 
-    return $req
+    return
 }
 
 # keep require happy

@@ -2,8 +2,9 @@
 # housekeeping
 ########################################################################
 package Net::AWS::Glacier::API;
-use v5.16;
+use v5.20;
 use autodie;
+use experimental    qw( lexical_subs );
 
 use Digest::SHA;
 use HTTP::Request;
@@ -11,7 +12,7 @@ use JSON 2.61;
 use LWP::UserAgent;
 use POSIX;
 
-use Net::Amazon::Signature::V4;
+use Net::AWS::Signature::V4;
 use Net::Amazon::TreeHash       qw( :tree_hash );
 
 use Carp            qw( carp croak                          );
@@ -269,7 +270,9 @@ my $generate_request
 
     # caller gets back signed request
 
-    $api->{sig}->sign( $req )
+    $api->{ sig }->sign( $req );
+
+    $req
 };
 
 my $send_request
@@ -283,6 +286,8 @@ my $send_request
     $res->is_success
     or do
     {
+        $DB::single = 1;
+
         # try to decode Glacier error, failing that 
         # report ua errors.
 
@@ -457,7 +462,7 @@ sub initialize
     my $key     = shift or croak "false 'key'";
     my $secret  = shift or croak "false 'secret'";
 
-    my $sig     = Net::Amazon::Signature::V4->new
+    my $sig     = Net::AWS::Signature::V4->new
     (
         $key, $secret, $region, 'glacier'
     );
@@ -477,7 +482,7 @@ sub initialize
 
 sub new
 {
-    my $api = &construt;
+    my $api = &construct;
     $api->initialize( @_ );
     $api
 }
@@ -538,8 +543,6 @@ for
 
 sub list_vaults
 {
-$DB::single = 1;
-
     local @CARP_NOT = ( __PACKAGE__ );
 
     my $api = shift;
