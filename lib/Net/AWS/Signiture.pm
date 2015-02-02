@@ -275,8 +275,7 @@ sub construct
 sub initialize
 {
     state $fieldz   = [ qw( key secret endpoint service ) ];
-
-    my $sig = shift;
+    my $sig         = shift;
 
     for my $key ( @$fieldz )
     {
@@ -298,6 +297,8 @@ sub new
 
 sub sign
 {
+$DB::single = 1;
+
     my $sig     = shift;
     my $req     = shift
     or croak "Bogus sign: false request";
