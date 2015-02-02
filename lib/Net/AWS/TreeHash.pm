@@ -4,6 +4,7 @@
 package Net::AWS::TreeHash;
 use v5.20;
 use autodie;
+use experimental 'lexical_subs';
 
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
@@ -25,38 +26,30 @@ my $empty   = sha256 '';
 
 sub MiB() { 2 ** 20 };
 
-my $reduce_hash
-= do
+my sub reduce_hash
 {
-    my $handler  = '';
+    # iterate reducing the pairs of 1MiB data units to a single value.
+    # "2 > @_" intentionally returns undef for an empty list.
 
-    $handler
-    = sub
+    return $_[0]
+    if 2 > @_;
+
+    # note that splice returns a single-entry list for the
+    # last iteration of an odd list.
+
+    my $count  => @_ / 2 + @_ % 2;
+
+    @_
+    = map
     {
-        # iterate reducing the pairs of 1MiB data units to a single value.
-        # "2 > @_" intentionally returns undef for an empty list.
-
-        return $_[0]
-        if 2 > @_;
-
-        # note that splice returns a single-entry list for the
-        # last iteration of an odd list.
-
-        my $count   = @_ / 2 + @_ % 2;
-
-        @_
-        = map
-        {
-            sha256 splice @_, 0, 2
-        }
-        ( 1 .. $count );
-
-        goto &$handler
+        sha256 splice @_, 0, 2
     }
-};
+    ( 1 .. $count );
 
-my $buffer_hash
-= sub
+    goto __SUB__
+}
+
+my sub buffer_hash
 {
     my $buffer  = shift;
     my $size    = length $buffer
@@ -65,7 +58,7 @@ my $buffer_hash
     my $count   = int( $size / MiB );
     ++$count if $size % MiB;
 
-    $reduce_hash->
+    reduce_hash
     (
         map
         {
@@ -73,7 +66,7 @@ my $buffer_hash
         }
         ( 1 .. $count )
     )
-};
+}
 
 ########################################################################
 # methods
@@ -92,7 +85,7 @@ sub import
     {
         # mainly for testing.
 
-        *{ qualify_to_ref 'reduce_hash', $caller  } = $reduce_hash;
+        *{ qualify_to_ref 'reduce_hash', $caller  } = \&reduce_hash;
     }
 
     return
@@ -128,14 +121,14 @@ sub tree_hash
 {
     blessed $_[0] and shift;
 
-    $buffer_hash->( @_ )
+    &buffer_hash
 }
 
 sub part_hash
 {
     my ( $t_hash, $buffer ) = @_;
 
-    push @$t_hash, $buffer_hash->( $buffer )
+    push @$t_hash, buffer_hash $buffer
 }
 
 sub final_hash
@@ -144,7 +137,7 @@ sub final_hash
 
     @$t_hash    or croak 'Bogus final_hash: no part hashes available';
 
-    $reduce_hash->( @$t_hash )
+    reduce_hash @$t_hash
 }
 
 # keep require happy

@@ -17,6 +17,8 @@ use Symbol      qw( qualify_to_ref );
 
 sub import
 {
+$DB::single = 1;
+
     shift;
 
     state $package  = 'Net::AWS::Glacier::API';
@@ -25,15 +27,23 @@ sub import
     {
         use_ok $package;
 
-        my $config  = "$etc/aws-config.gz";
+        my $config  = "$etc/aws-config";
 
         -e $config  or die "Non-existant: '$config";
         -s _        or die "Empty file: '$config";
         -r _        or die "Non-readable: '$config";
 
-        open my $fh, '-|', "gzip -dc $config";
+        my @linz
+        = do
+        {
+            open my $fh, '<', $config;
 
-        chomp( my @linz = <$fh> );
+            my $text    = do { local $/; readline $fh };
+
+            $text   =~ s{^ \s* # .* }{}gmx;
+
+            split /\n+/, $text;
+        };
 
         3 == @linz or die "Bogus config: line count != 3";
 
