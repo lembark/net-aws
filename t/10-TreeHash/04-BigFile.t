@@ -17,12 +17,18 @@ use Net::AWS::TreeHash  qw( :tree_hash      );
 
 sub MiB()   { 2 ** 20 };
 
-my $expensive   = $ENV{ EXPENSIVE_TESTS };
-
 my $count
 = do
 {
-    if( $expensive )
+    diag 'Test memory footprint with large number of iterations.';
+
+    if( my $env = $ENV{ TREEHASH_TEST_CYCLES } )
+    {
+        diag "Using cycle count = $env (\$TREEHASH_TEST_CYCLES)";
+
+        $env
+    }
+    elsif( $ENV{ EXPENSIVE_TESTS } )
     {
         # i.e., roughly 1/2 TB.
         # each 128MiB buffer has 256 sha256 hash values computed.
@@ -31,13 +37,12 @@ my $count
         diag "Using large buffer count to test memory footprint.";
         diag "Suggset finding alternate amusements for a while...";
 
-        4096
+        1024
     }
     else
     {
         diag "Using small buffer count to test memory footprint.";
         diag "For more effecive, if longer, test set EXPENSEIVE_TESTS";
-        diag "Expected runtime: ~20 minutes";
 
         32
     }
@@ -45,18 +50,30 @@ my $count
 
 my $size    = 128 * MiB;
 my $total   = $size * $count;
-my $time    = 2 * $count;
-
-########################################################################
-# package variables
-########################################################################
-
-note "This is basically a test for memory leaks processing large files";
 
 note "Buffer:  $size";
 note "Cycles:  $count";
 note "Input:   $total";
-diag "Runtime: $time sec";
+
+diag 
+do
+{
+    # give the poor slobs who picked EXPENSIVE_TESTS some idea
+    # of what they are in for...
+
+    my $t0  = Benchmark->new;
+    tree_hash ' ' x $size;
+    my $t1  = Benchmark->new;
+
+    my $sec = 2 * $count * ( $t1->[0] - $t0->[0] );
+    my $est = 1 + int $sec;
+
+    "Est. runtime: $est sec ($total bytes)"
+};
+
+########################################################################
+# package variables
+########################################################################
 
 my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
 my $buffer  = "\c@" x $size;
@@ -80,7 +97,6 @@ for my $i ( 1 .. $count )
     my $str = timestr $dt;
 
     note "Pass: $i ($str)";
-
     my $expect  = tree_hash $buffer;
     my $found   = $t_hash->[-1];
 
