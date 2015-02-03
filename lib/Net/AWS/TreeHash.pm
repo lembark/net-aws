@@ -6,9 +6,11 @@ use v5.20;
 use autodie;
 use experimental 'lexical_subs';
 
+use Const::Fast;
+
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
-use List::MoreUtils qw( natatime        );
+use List::Util      qw( max             );
 use Scalar::Util    qw( blessed         );
 use Symbol          qw( qualify_to_ref  );
 
@@ -36,10 +38,16 @@ my $reduce_hash
     return $_[0]
     if 2 > @_;
 
-    my $chunks  = ( @_ / 2 ) + ( @_ % 2 );
-    my $iter    = natatime 2, @_;
+    const my $chunks => ( @_ / 2 ) + ( @_ % 2 );
 
-    @_  = map { sha256 $iter->() } ( 1 .. $chunks );
+    @_  
+    = map
+    {
+        const my $i => 2 * ( $_ - 1 );
+
+        sha256 @_[ $i .. max( $i+1, $#_) ]
+    }
+    ( 1 .. $chunks );
 
     goto __SUB__
 };
