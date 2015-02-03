@@ -76,7 +76,7 @@ do
 ########################################################################
 
 my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
-my $buffer  = "\c@" x $size;
+my $buffer  = ' ' x $size; # "\c@" x $size;
 
 for my $length ( length $buffer )
 {
@@ -90,7 +90,7 @@ for my $i ( 1 .. $count )
 {
     my $t0  = Benchmark->new;
 
-    my $j   = $t_hash->part_hash( $buffer );
+    my $th  = $t_hash->part_hash( $buffer );
 
     my $t1  = Benchmark->new;
     my $dt  = timediff $t1, $t0;
@@ -100,10 +100,10 @@ for my $i ( 1 .. $count )
     my $expect  = tree_hash $buffer;
     my $found   = $t_hash->[-1];
 
-    $i == $j
+    $th eq $expect
     or do
     {
-        fail "Miscount: $i != $j";
+        fail "Invalid return: pass $i last t_hash != hash returned";
         last
     };
 
@@ -127,17 +127,11 @@ for my $i ( 1 .. $count )
 }
 continue
 {
-    state $sanity   = '';
+    state $i        = -1;
 
-    $sanity = $buffer;
-
-    my $i   = int rand $size;
-    my $a   = $letterz[ rand @letterz ];
+    my $a   = $letterz[ ++$i % @letterz ];
 
     substr $buffer, $i, 1, $a;
-
-    $sanity ne $buffer
-    or BAIL_OUT "Failed buffer update: '$a' at $i leaves buffer unchanged";
 }
 
 my $hashes  = @$t_hash;
