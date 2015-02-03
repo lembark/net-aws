@@ -13,7 +13,17 @@ sub MiB()   { 2 ** 20 };
 use Net::AWS::TreeHash qw( :tree_hash :reduce_hash );
 
 my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
-my @buffsiz = ( 1, 2, 4, 8, 32, 64, 128, 256, 512, 1024 );
+my @buffsiz = ( 1, 2, 4, 8, 32, 64 );
+
+if( $ENV{ EXPENSIVE_TESTS } )
+{
+    diag "Adding 128 .. 1024 based on EXPENSIVE_TESTS set";
+    push @buffsiz, ( 128, 256, 512, 1024 );
+}
+else
+{
+    diag "Skipping 128 .. 1024 based on EXPENSIVE_TESTS not set";
+}
 
 plan tests => @buffsiz * 3;
 
