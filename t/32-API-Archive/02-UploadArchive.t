@@ -36,14 +36,20 @@ SKIP:
 
     if( my $vault_data  = $::glacier->describe_vault( $vault ) )
     {
-        # the stable archvie test vault does exist 
+        # the stable archive test vault does exist 
 
         $a = $vault_data->{ LastInventoryDate }
         ? diag "Vault inventory: '$a'"
         : diag "Vault '$vault' has no inventory", explain $vault_data
         ;
 
-        my $arch_id = eval { $glacier->upload_archive( $vault, $0 ) };
+        $DB::single = 1;
+
+        my $content = qx{ cat $0 };
+
+        my $arch_id 
+        = eval { $glacier->upload_archive( $vault, $content ) };
+
         my $error   = $@;
 
         note "Error:", $error   if $error;
