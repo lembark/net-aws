@@ -20,7 +20,7 @@ use Symbol          qw( qualify_to_ref                      );
 use File::Slurp     9999.19;
 
 use Net::AWS::Signature::V4;
-use Net::AWS::TreeHash  qw( :tree_hash );
+use Net::AWS::TreeHash      qw( :tree_hash :reduce_hash );
 
 ########################################################################
 # package variables
@@ -76,16 +76,6 @@ my $sanitize_description
     }
 
     shift
-};
-
-my $tree_hash
-= sub
-{
-	my $th = Net::AWS::TreeHash->new();
-
-	$th->eat_data ( shift );
-	$th->calc_tree;
-    $th->get_final_hash
 };
 
 my $sha_256
@@ -146,79 +136,6 @@ my $generate_request_content
             )
         )
     }
-};
-
-my $tree_hash_arrayref
-= sub
-{
-    state $non_hex_rx   = qr{^ [^A-Fa-f0-9]{64} $}x;
-
-    my $hashz   = shift or croak "false tree hash list";
-
-    for my $type ( reftype $hashz )
-    {
-        'ARRAY' eq $type    and last;
-
-        croak "Non-arrayref tree hash list: '$type' ($hashz)";
-        
-    }
-    @$hashz or croak "empty tree hash list";
-
-    if( my $bogus = first { /$non_hex_rx/o } @$hashz )
-    {
-        croak "Non-tree-hash entry in list: '$bogus'";
-    }
-
-	# copy array to temporary array mapped to byte values
-
-	my @prevLvlHashes = map{ pack"H*", $_ } @{ $hashz };
-
-	# consume parts in pairs A (+) B until we have 
-    # one part (unrolled recursive)
-
-	while ( @prevLvlHashes > 1 )
-    {
-		my $prevLvlIterator = 0;
-        my $currLvlIterator = 0;
-		my @currLvlHashes   = ();
-
-		# consume two elements form previous level to 
-        # make for one element of the next 
-        # level, last elements on odd sized 
-        # arrays copied verbatim to next level
-
-        while( $prevLvlIterator < @prevLvlHashes )
-        {
-			if ( @prevLvlHashes - $prevLvlIterator > 1)
-            {
-				# store digest in next level as byte values
-
-                my $hash    = $sha_256->
-                (
-                    $prevLvlHashes[ $prevLvlIterator     ],
-                    $prevLvlHashes[ $prevLvlIterator + 1 ]
-                );
-
-				push @currLvlHashes, $hash;
-			}
-            else
-            {
-				push @currLvlHashes, $prevLvlHashes[ $prevLvlIterator ];
-			}
-		}
-        continue
-        {
-            $prevLvlIterator+=2
-        }
-
-		# advance one level
-
-		@prevLvlHashes = @currLvlHashes;
-	}
-
-	# return resulting array as string of hex values
-
-	unpack 'H*', $prevLvlHashes[0] 
 };
 
 ########################################################################
@@ -385,8 +302,8 @@ my $upload_content
 
 	my ( $api, $name, $content, $desc ) = @_;
 
-	my $th  = $tree_hash->( $content );
-    my $sha = $sha_256->( $content );
+	my $hash    = $api->t_hash( part_hash => $content );
+    my $sha     = $sha_256->( $content );
 
 	my $location = $api->$acquire_header
     (
@@ -395,7 +312,7 @@ my $upload_content
 		POST => "/-/vaults/$name/archives",
 		[
 			'x-amz-archive-description' => $desc,
-			'x-amz-sha256-tree-hash'    => $th,
+			'x-amz-sha256-tree-hash'    => $hash,
 			'x-amz-content-sha256'      => $sha,
 		],
 		$content
@@ -412,14 +329,27 @@ my $upload_single_archive
 {
     my $api     = shift;
     my $name    = shift or croak "false vault name";
-    my $content = shift or croak "false content reference";
+    my $archive = shift or croak "false content";
     my $desc    = $sanitize_description->( @_, $name );
 
-    for my $type ( reftype $content )
+    $api->t_hash( 'initialize' );
+
+    my $content
+    = do
     {
-        'SCALAR' eq $type
-        or croak "Content not a 'SCALAR' reference ($type)"
-    }
+        if( ref $archive )
+        {
+            # open file handle
+
+            local $/;
+
+            readline $archive
+        }
+        else
+        {
+            $archive
+        }
+    };
 
     $api->$upload_content
     (
@@ -464,15 +394,18 @@ sub initialize
     (
         $key, $secret, $region, 'glacier'
     );
+    
+    my $t_hash  = Net::AWS::TreeHash->new;
 
     say "# Initialize: '$region' api"
     if $verbose;
 
     %$api =
     (
-		region => $region,
-		ua     => $ua,
-		sig    => $sig,
+		region  => $region,
+		ua      => $ua,
+		sig     => $sig,
+        t_hash  => $t_hash,
 	);
 
 	return
@@ -485,13 +418,23 @@ sub new
     $api
 }
 
-sub compute_tree_hash
+sub final_hash
 {
     my $api = shift;
 
-    'ARRAY' eq reftype $_[0]
-    ? $tree_hash_arrayref->( $_[0] )
-    : $tree_hash_arrayref->( \@_   )
+    $api->{ t_hash }->final_hash
+}
+
+sub t_hash
+{
+    my $api     = shift;
+    my $name    = shift
+    or croak "Bogus t_hash: false method name";
+
+    my $t_hash  = $api->{ t_hash }
+    or croak "Botched api object: missing t_hash";
+
+    $t_hash->$name( @_ )
 }
 
 ########################################################################
@@ -593,8 +536,9 @@ sub set_vault_notifications
 
 for
 (
-    [ upload_archive_from_ref   => $upload_single_archive           ],
-    [ initiate_job              => \&initiate_inventory_retrieval   ],
+    [ upload_archive    => $upload_single_archive           ],
+    [ upload_file       => $upload_single_archive           ],
+    [ initiate_job      => \&initiate_inventory_retrieval   ],
 )
 {
     my ( $name, $ref ) = @$_;
@@ -717,6 +661,8 @@ sub multipart_upload_init
     my $size    = shift or croak "false partition size";
     my $desc    = $sanitize_description->( @_, $name );
 
+    $api->t_hash( 'initialize' );
+
     $api->$send_request
     (
         'x-amz-multipart-upload-id',
@@ -742,9 +688,12 @@ sub multipart_upload_upload_part
     my $content = shift or croak "false parition content";
 
     my $length  = length $content
-    or croak "Empty content";
+    or croak "Empty content (chunk $index)";
 
-    my $th      = $tree_hash->( $content );
+    $length == $size
+    or croak "Mis-sized content: $length ($size)";
+
+    my $hash    = $api->t_hash( part_hash => $content );
     my $sha     = $sha_256->( $content );
     my $bytes   
     = do
@@ -758,9 +707,10 @@ sub multipart_upload_upload_part
 	# range end must not be ( $size * ( $index + 1 ) - 1 )
     # or last part will fail.
 
-	my $found = $api->$acquire_header
+	my $found
+    = $api->$acquire_header
     (
-        # NB: $sha:  # documentation seems to suggest 
+        # NB: $sha, documentation seems to suggest
         # x-amz-content-sha256 may not be needed but it is!
 
         'x-amz-sha256-tree-hash',
@@ -771,7 +721,7 @@ sub multipart_upload_upload_part
 			'Content-Range'             => $bytes,
 			'Content-Length'            => $size,
 			'Content-Type'              => 'application/octet-stream',
-			'x-amz-sha256-tree-hash'    => $th,
+			'x-amz-sha256-tree-hash'    => $hash,
 			'x-amz-content-sha256'      => $sha,
 		],
 		$content
@@ -779,10 +729,10 @@ sub multipart_upload_upload_part
 
 	# check glacier tree-hash = local tree-hash
 
-    $th eq $found 
-    or croak "Request returns invalid tree hash: '$found' ($th)";
+    $hash eq $found 
+    or croak "Request returns invalid tree hash: '$found' ($hash)";
 
-    $th
+    $hash
 }
 
 sub multipart_upload_complete 
@@ -794,20 +744,21 @@ sub multipart_upload_complete
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $mult_id = shift or croak "false multipart upload id";
-    my $hashz   = shift or croak "false tree hash array ref";
     my $size    = shift or croak "false total archive size";
 
     looks_like_number $size
     or croak "Non-numeric archive size: '$size'";
 
-	my $tree_hash   = $tree_hash_arrayref->( $hashz );
-	my $location    = $api->$acquire_header
+	my $hash    = $api->t_hash( 'final_hash' );
+
+	my $location
+    = $api->$acquire_header
     (
         location =>
 
 		POST => "/-/vaults/$name/multipart-uploads/$mult_id",
 		[
-			'x-amz-sha256-tree-hash'    => $tree_hash,
+			'x-amz-sha256-tree-hash'    => $hash,
 			'x-amz-archive-size'        => $size,
 		],
 	);
@@ -891,7 +842,7 @@ sub initiate_archive_retrieval
         qw( Type archive-retrieval ArchiveID ), $arch_id
     };
 
-    $content->{ Description } = $desc   if $desc  ne '';
+    $content->{ Description } = $desc;
     $content->{ SNSTopic    } = $topic  if $topic ne '';
 
     $api->$acquire_header
@@ -914,10 +865,8 @@ sub initiate_inventory_retrieval
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $format  = shift or croak "false return data format ($name)";
-    my $desc    = $sanitize_description->( @_, $name );
+    my $desc    = $sanitize_description->( @_, 'Inventory ' . $name );
     my $topic   = shift // '';
-
-    $desc   ||= "Inventory $name";
 
     first { $format eq $_ } @$valid
     or do
@@ -929,7 +878,7 @@ sub initiate_inventory_retrieval
 	my $content =
     { qw( Type inventory-retrieval Format ), $format };
 
-    $content->{ Description } = $desc   if $desc  ne '';
+    $content->{ Description } = $desc;
     $content->{ SNSTopic    } = $topic  if $topic ne '';
 
 	$api->$acquire_header
@@ -1185,12 +1134,13 @@ Version 0.01
         $description        # optional
     );
 
-    my $tree_hash   = $api->multipart_upload_upload_part
+    $api->multipart_upload_upload_part
     (
         $vault_name,
-        $upload_id,         # from multipart_upload_init
-        $partition_size,    # from calculate or max
-        $partition_index,   # 1 .. N
+        $upload_id,     # from multipart_upload_init
+        $size,          # size in bytes
+        $index,         # 1 .. N
+        $partition      # partition contents
     );
 
     my $archive_id  = $api->multipart_upload_complete 
@@ -1591,7 +1541,7 @@ via Carp::croak describing how the request failed.
     # this is compared to ArchiveSHA256TreeHash from the 
     # describe_job results to validate the contents.
 
-    my $arch_hash   = $api->compute_tree_hash( \@hashz );
+    my $arch_hash   = $api->final_hash;
 
 
 =item Load a multi-partition archive
