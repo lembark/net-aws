@@ -8,6 +8,7 @@ use experimental 'lexical_subs';
 
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
+use List::MoreUtils qw( natatime        );
 use Scalar::Util    qw( blessed         );
 use Symbol          qw( qualify_to_ref  );
 
@@ -35,28 +36,22 @@ my $reduce_hash
     return $_[0]
     if 2 > @_;
 
-    # note that splice returns a single-entry list for the
-    # last iteration of an odd list.
-
     my $chunks  = ( @_ / 2 ) + ( @_ % 2 );
+    my $iter    = natatime 2, @_;
 
-    @_
-    = map
-    {
-        sha256 splice @_, 0, 2
-    }
-    ( 1 .. $chunks );
+    @_  = map { sha256 $iter->() } ( 1 .. $chunks );
 
     goto __SUB__
 };
 
-my sub buffer_hash
+my $buffer_hash
+= sub
 {
     state $format   = '(a' . MiB . ')*';
 
     my $buffer  = shift;
     my $size    = length $buffer
-    or return @_;
+    or return;
 
     $reduce_hash->
     (
@@ -66,30 +61,26 @@ my sub buffer_hash
         }
         unpack $format, $buffer
     )
-}
-
-########################################################################
-# methods
-########################################################################
+};
 
 sub import
 {
     my $caller  = caller;
 
-    if( grep { ':tree_hash' eq $_ } @_ )
-    {
-        *{ qualify_to_ref 'tree_hash', $caller  } = \&tree_hash;
-    }
+    grep { ':tree_hash' eq $_ } @_
+    and
+    *{ qualify_to_ref 'tree_hash', $caller  } = \&tree_hash;
 
-    if( grep { ':reduce_hash' eq $_ } @_ )
-    {
-        # mainly for testing.
-
-        *{ qualify_to_ref 'reduce_hash', $caller  } = $reduce_hash;
-    }
+    grep { ':reduce_hash' eq $_ } @_ 
+    and
+    *{ qualify_to_ref 'reduce_hash', $caller  } = $reduce_hash;
 
     return
 }
+
+########################################################################
+# methods
+########################################################################
 
 ########################################################################
 # construction
@@ -99,14 +90,12 @@ sub construct
     my $proto   = shift;
     bless [], blessed $proto || $proto
 }
-
 sub initialize
 {
     my $t_hash  = shift;
     @$t_hash    = ();
     return
 }
-
 sub new
 {
     my $t_hash  = &construct;
@@ -121,21 +110,22 @@ sub tree_hash
 {
     blessed $_[0] and shift;
 
-    &buffer_hash
+    &$buffer_hash
 }
 
 sub part_hash
 {
     my ( $t_hash, $buffer ) = @_;
 
-    push @$t_hash, buffer_hash $buffer
+    $t_hash->[ @$t_hash ] = $buffer_hash->( $buffer )
 }
 
 sub final_hash
 {
     my $t_hash  = shift;
 
-    @$t_hash    or croak 'Bogus final_hash: no part hashes available';
+    @$t_hash
+    or croak 'Bogus final_hash: no part hashes available';
 
     $reduce_hash->( @$t_hash )
 }
@@ -147,7 +137,7 @@ __END__
 
 =head1 SYNOPSIS
 
-This module implements TreeHash algorithm for Amazon AWS 
+This module implements TreeHash algorithm for Amazon AWS
 Glacier API (version 2012-06-01)
 
 Usage:
@@ -175,7 +165,7 @@ Usage:
 
     send_final_message $total_hash;
 
-    # at this point either let $t_hash go out of scope 
+    # at this point either let $t_hash go out of scope
     # or call $t_hash->initialize to reset the list of
     # partition hashes.
 
@@ -183,7 +173,7 @@ Usage:
 
 Note: Perl-5.20 added internal Copy on Write semantics for strings.
 This obviates the need for pass-by-reference for the buffers: they
-are passed as strings with the internal COW mechanics minimizing 
+are passed as strings with the internal COW mechanics minimizing
 the overhead.
 
 
