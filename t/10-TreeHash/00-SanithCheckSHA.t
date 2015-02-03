@@ -5,8 +5,9 @@ use autodie;
 
 use Test::More;
 
-use Benchmark       qw( timethese       );
-use Digest::SHA     qw( sha256          );
+use Benchmark           qw( timethese       );
+use Digest::SHA         qw( sha256          );
+use Net::AWS::Treehash  qw( :tree_hash );
 
 sub MiB()   { 2 ** 20 };
 
@@ -36,7 +37,25 @@ my $pass2
     return
 };
 
-diag timethese MiB => { Substr => $pass1, SHA256 => $pass2 };
+my $pass3
+= sub
+{
+    state $a    = ' ' x MiB;
+    state $i    = -1;
+
+    substr $a, ++$i, 1, $letterz[ $i % @letterz ];
+
+    tree_hash $a;
+
+    return
+};
+
+diag timethese MiB =>
+{
+    Substr      => $pass1,
+    SHA256      => $pass2,
+    TreeHash    => $pass3,
+};
 
 pass "Survived the benchmark on 1MiB buffer";
 

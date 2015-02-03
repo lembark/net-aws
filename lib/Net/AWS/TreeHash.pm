@@ -73,15 +73,27 @@ my $buffer_hash
 
 sub import
 {
-    my $caller  = caller;
+    shift;
 
-    grep { ':tree_hash' eq $_ } @_
-    and
-    *{ qualify_to_ref 'tree_hash', $caller  } = \&tree_hash;
+    if( @_ )
+    {
+        my $caller  = caller;
 
-    grep { ':reduce_hash' eq $_ } @_ 
-    and
-    *{ qualify_to_ref 'reduce_hash', $caller  } = $reduce_hash;
+        for
+        (
+            [ tree_hash     => \&tree_hash  ],
+            [ reduce_hash   => $reduce_hash ],
+            [ buffer_hash   => $buffer_hash ],
+        )
+        {
+            my ( $name, $ref ) = @$_;
+
+            grep { ":$name" eq $_ } @_
+            or next;
+
+            *{ qualify_to_ref $name, $caller  } = $ref;
+        }
+    }
 
     return
 }
