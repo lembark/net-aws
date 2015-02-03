@@ -23,6 +23,13 @@ my $madness = 'Net::AWS::Glacier::API';
 
 sub read_creds
 {
+    state $credfile_rx = 
+    [
+        qr{ ^ Location \W+ }x,
+        qr{ ^ Access \s* Key \s* ID \W+ }x,
+        qr{ ^ Secret \s* Access \s* Key \W+ }x
+    ];
+
     my $config  = "$etc/test.conf";
 
     -e $config  or die "Non-existant: '$config";
@@ -34,14 +41,40 @@ sub read_creds
     {
         open my $fh, '<', $config;
 
-        my $text    = do { local $/; readline $fh };
+        chomp ( my @l = readline $fh );
 
-        $text   =~ s{^ \s* # .* }{}gmx;
-
-        split /\n+/, $text;
+        grep { $_ } @l
     };
 
-    3 == @linz or die "Bogus config: line count != 3";
+    @linz
+    = map
+    {
+        my $rx  = $_;
+
+        my @found
+        = map
+        {
+            s{ $rx }{}x
+            ? $_
+            : ()
+        }
+        @linz;
+
+        1 == @found
+        or die "Multiple matching lines ($rx)";
+
+        @found
+    }
+    @$credfile_rx;
+
+    @linz == @$credfile_rx
+    or do
+    {
+        my $n   = @$credfile_rx;
+        my $m   = @linz;
+
+        die "Botched $config: $m lines ($n expected)";
+    };
 
     wantarray
     ?  @linz
