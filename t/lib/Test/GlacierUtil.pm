@@ -25,9 +25,13 @@ sub import
 {
     shift;
 
-    require Test::GlacierAPI;
+    my  @credz 
+    = eval
+    {
+        require Test::GlacierAPI;
 
-    my  @credz  = eval { Test::GlacierAPI->read_creds }
+        Test::GlacierAPI->read_creds
+    }
     or BAIL_OUT "Unable to read credentials ($@)";
 
     use_ok $madness;

@@ -12,15 +12,15 @@ use JSON 2.61;
 use LWP::UserAgent;
 use POSIX;
 
-use Net::AWS::Signature::V4;
-use Net::Amazon::TreeHash       qw( :tree_hash );
-
 use Carp            qw( carp croak                          );
 use List::Util      qw( first                               );
 use Scalar::Util    qw( blessed reftype looks_like_number   );
 use Symbol          qw( qualify_to_ref                      );
 
 use File::Slurp     9999.19;
+
+use Net::AWS::Signature::V4;
+use Net::AWS::TreeHash  qw( :tree_hash );
 
 ########################################################################
 # package variables
@@ -81,7 +81,7 @@ my $sanitize_description
 my $tree_hash
 = sub
 {
-	my $th = Net::Amazon::TreeHash->new();
+	my $th = Net::AWS::TreeHash->new();
 
 	$th->eat_data ( shift );
 	$th->calc_tree;
@@ -131,7 +131,7 @@ my $generate_request_content
 
     if( 'SCALAR' eq reftype $input )
     {
-        shift
+        $input
     }
     else
     {
@@ -286,8 +286,6 @@ my $send_request
     $res->is_success
     or do
     {
-        $DB::single = 1;
-
         # try to decode Glacier error, failing that 
         # report ua errors.
 
@@ -400,7 +398,7 @@ my $upload_content
 			'x-amz-sha256-tree-hash'    => $th,
 			'x-amz-content-sha256'      => $sha,
 		],
-		$$content
+		$content
 	);
 
 	my ( $arch_id ) = $location =~ $header_rx 
@@ -741,16 +739,13 @@ sub multipart_upload_upload_part
     my $mult_id = shift or croak "false multi-part load id";
     my $size    = shift or croak "false partition size";
     my $index   = shift or croak "false partition index";
+    my $content = shift or croak "false parition content";
 
-    # at this point the content is on the stack.
-
-    my $content = &$generate_request_content;
-
-    my $length  = length $$content
+    my $length  = length $content
     or croak "Empty content";
 
     my $th      = $tree_hash->( $content );
-    my $sha     = $sha_256->( $$content );
+    my $sha     = $sha_256->( $content );
     my $bytes   
     = do
     {
@@ -779,7 +774,7 @@ sub multipart_upload_upload_part
 			'x-amz-sha256-tree-hash'    => $th,
 			'x-amz-content-sha256'      => $sha,
 		],
-		$$content
+		$content
 	);
 
 	# check glacier tree-hash = local tree-hash
