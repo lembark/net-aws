@@ -92,8 +92,10 @@ sub import
 
     my $caller  = caller;
 
-    Net::AWS::Signature::V4->verbose( 1 )
-    if $ENV{ GLACIER_TEST_VERBOSE };
+    Net::AWS::Signature::V4->verbose
+    (
+        !! $ENV{ GLACIER_TEST_VERBOSE }
+    );
 
     diag "Install: API object -> $caller";
 
