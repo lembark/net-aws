@@ -53,8 +53,7 @@ my $reduce_hash
 my $buffer_hash
 = sub
 {
-    state $mib      = 2 ** 20;
-    state $format   = "(a$mib)*";
+    state $format   = '(a' . 2**20 . ')*';
 
     my $buffer  = shift;
     my $size    = length $buffer
