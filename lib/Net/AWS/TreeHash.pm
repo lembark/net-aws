@@ -18,7 +18,7 @@ use Symbol          qw( qualify_to_ref  );
 # package variables
 ########################################################################
 
-our $VERSION = '0.71';
+our $VERSION = '0.80';
 $VERSION = eval $VERSION;
 
 my $empty   = sha256 '';
@@ -26,8 +26,6 @@ my $empty   = sha256 '';
 ########################################################################
 # utility subs
 ########################################################################
-
-my sub MiB() { 2 ** 20 };
 
 my $reduce_hash
 = sub
@@ -55,7 +53,8 @@ my $reduce_hash
 my $buffer_hash
 = sub
 {
-    state $format   = '(a' . MiB . ')*';
+    state $mib      = 2 ** 20;
+    state $format   = "(a$mib)*";
 
     my $buffer  = shift;
     my $size    = length $buffer
