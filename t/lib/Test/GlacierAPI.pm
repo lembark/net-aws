@@ -11,6 +11,8 @@ use Test::More;
 
 use Symbol      qw( qualify_to_ref );
 
+use Net::AWS::Signature::V4;
+
 ########################################################################
 # package variables
 ########################################################################
@@ -89,6 +91,8 @@ sub import
     state $credz    = read_creds;
 
     my $caller  = caller;
+
+    Net::AWS::Signature::V4->verbose( 1 );
 
     diag "Install: API object -> $caller";
 
