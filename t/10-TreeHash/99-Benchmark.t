@@ -64,6 +64,7 @@ my $pass4
     return
 };
 
+diag 'Benchmarking substring, sha256, buffer_hash calls';
 diag "Substr\t"         => timestr timeit MiB, $pass1;
 diag "SHA256\t"         => timestr timeit KiB, $pass2;
 diag "BuffHash 1\t"     => timestr timeit KiB, $pass3;
