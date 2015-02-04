@@ -61,7 +61,7 @@ sub read_creds
         @linz;
 
         1 == @found
-        or die "Multiple matching lines ($rx)";
+        or die "Missing/multiple matching lines ($rx)";
 
         @found
     }
