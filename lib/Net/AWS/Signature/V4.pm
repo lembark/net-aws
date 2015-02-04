@@ -6,6 +6,8 @@ use v5.20;
 use autodie;
 use experimental qw( lexical_subs );
 
+use Data::Dumper;
+
 use Carp            qw( croak                                   );
 use Digest::SHA     qw( sha256_hex hmac_sha256 hmac_sha256_hex  );
 use List::Util      qw( reduce                                  );
@@ -22,9 +24,43 @@ our @CARP_NOT   = ( __PACKAGE__ );
 
 sub ALGORITHM() { 'AWS4-HMAC-SHA256' }
 
+my $verbose     = 1;
+
 ########################################################################
 # utility subs
 ########################################################################
+
+sub verbose
+{
+    @_ > 1
+    ? $verbose = !! $_[1]
+    : $verbose
+}
+
+sub debug
+{
+$DB::single = 1;
+
+    local $Data::Dumper::Terse      = 1;
+    local $Data::Dumper::Indent     = 1;
+    local $Data::Dumper::Sortkeys   = 1;
+
+    local $Data::Dumper::Purity     = 0;
+    local $Data::Dumper::Deepcopy   = 0;
+    local $Data::Dumper::Quotekeys  = 0;
+
+    my $head    = shift;
+
+    my $message 
+    = join "\n" => '', $head, map { ref $_ ? Dumper $_ : "'$_'"  } @_;
+
+    $message    =~ s{^}{# }gmx;
+
+    say $message;
+
+    return
+
+}
 
 ########################################################################
 # extract & format pieces of the request
@@ -58,7 +94,12 @@ my $c_hash
 
     my $req     = shift;
 
-    $req->header( $field) || sha256_hex( $req->content );
+    my $hash    = $req->header( $field) || sha256_hex( $req->content );
+
+    debug 'Canonical hash:', $hash
+    if $verbose;
+
+    $hash
 };
 
 my $c_path 
@@ -80,6 +121,9 @@ my $c_path
         s{ / $}{}x;
     }
 
+    debug 'Canonical path:',  $path
+    if $verbose;
+
     $path
 };
 
@@ -88,8 +132,9 @@ my $c_query
 {
     my $req     = shift;
 
-    join '&' =>
-    map
+    my $query
+    = join '&'
+    => map
     {
         defined $_->[1]
         ? join '=' => @$_
@@ -107,7 +152,12 @@ my $c_query
 
         [ lc $key, $val ]
     }
-    split '&', $req->uri->query
+    split '&', $req->uri->query;
+
+    debug 'Canonical query:', $query
+    if $verbose;
+
+    $query
 };
 
 my $sign_heads
@@ -115,7 +165,8 @@ my $sign_heads
 {
     my $req     = shift;
 
-    join ';' =>
+    my $header
+    = join ';' =>
     sort
     {
         $a cmp $b
@@ -124,7 +175,12 @@ my $sign_heads
     {
         lc
     }
-    $req->headers->header_field_names
+    $req->headers->header_field_names;
+
+    debug 'Signed headers:', $header
+    if $verbose;
+
+    $header
 };
 
 my $c_heads
@@ -159,33 +215,42 @@ my $c_heads
     }
     $head->header_field_names;
 
+    debug 'Canonical headers:', \@headz
+    if $verbose;
+
     join "\n" => @headz, ''
 };
 
 my $canonical_hash
 = sub
 {
+$DB::single = 1;
+
+    state $extractz = 
+    [
+        method =>
+        $c_path,
+        $c_query,
+        $c_heads,
+        $sign_heads,
+        $c_hash,
+    ];
+
     my $req     = shift;
 
-    my $method  = $req->method;
-    my $path    = $req->$c_path;
-    my $query   = $req->$c_query;
-    my $hash    = $req->$c_hash;
-    my $c_head  = $req->$c_heads;
-    my $s_head  = $req->$sign_heads;
+    my @sign_fieldz
+    = map
+    {
+        $req->$_
+    }
+    @$extractz;
 
-    my $c_string
-    = join "\n" =>
-    (
-        $method,
-        $path,
-        $query,
-        $c_head,
-        $s_head,
-        $hash
-    );
+    my $hash        = sha256_hex join "\n" => @sign_fieldz;
 
-    sha256_hex $c_string
+    debug 'Canonical request hash:', $hash, \@sign_fieldz
+    if $verbose;
+
+    $hash
 };
 
 my $sig_scope
@@ -197,7 +262,13 @@ my $sig_scope
 
     my $date    = $req->$datetime->strftime( '%Y%m%d' );
 
-	join '/' => $date, @{ $sig }{ qw( endpoint service ) }, $type
+    my $scope   
+    = join '/' => $date, @{ $sig }{ qw( endpoint service ) }, $type;
+
+    debug 'Scope:', $scope
+    if $verbose;
+
+    $scope
 };
 
 my $string_to_sign
@@ -212,14 +283,21 @@ my $string_to_sign
 
     my $scope   = $sig->$sig_scope( $req );
 
-    join "\n" =>
-    ALGORITHM,
-    $date,
-    $scope,
-    $hash
+    my @fieldz = 
+    (
+        ALGORITHM,
+        $date,
+        $scope,
+        $hash
+    );
+
+    debug 'Sign string fields:', \@fieldz
+    if $verbose;
+
+    join "\n" => @fieldz
 };
 
-my $authz
+my $authz_string
 = sub
 {
     state $cred_tag = 'aws4_request';
@@ -242,6 +320,9 @@ my $authz
     = reduce
     {
         # notice the order of ymd and secret due to "$b, $a".
+
+        say "Hashing: '$b', '$a'"
+        if $verbose;
 
         hmac_sha256 $b, $a
     }
@@ -296,9 +377,14 @@ sub sign
     my $req     = shift
     or croak "Bogus sign: false request";
 
-    my $value   = $sig->$authz( $req );
+    my $authz   = $sig->$authz_string( $req );
 
-    $req->header( Authorization => $value );
+    debug 'Authorization:', $authz
+    if $verbose;
+
+    $req->header( Authorization => $authz );
+
+    debug 'Request:', $req->as_string;
 
     return
 }
