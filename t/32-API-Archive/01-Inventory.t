@@ -47,8 +47,6 @@ SKIP:
         $::glacier->initiate_inventory_retrieval( $vault, 'JSON' )
     };
 
-$DB::single = 1;
-
     note 'Error:', $@;
 
     if( $@ )
