@@ -321,7 +321,7 @@ my $authz_string
     {
         # notice the order of ymd and secret due to "$b, $a".
 
-        say "Hashing: '$b', '$a'"
+        say "# Hashing: '$b', '$a'"
         if $verbose;
 
         hmac_sha256 $b, $a
