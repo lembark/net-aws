@@ -6,13 +6,13 @@ use v5.20;
 use autodie;
 use experimental    qw( lexical_subs );
 
-use Digest::SHA;
 use HTTP::Request;
 use JSON 2.61;
 use LWP::UserAgent;
 use POSIX;
 
 use Carp            qw( carp croak                          );
+use Digest::SHA     qw( sha256_hex                          );
 use List::Util      qw( first                               );
 use Scalar::Util    qw( blessed reftype looks_like_number   );
 use Symbol          qw( qualify_to_ref                      );
@@ -76,27 +76,6 @@ my $sanitize_description
     }
 
     shift
-};
-
-my $sha_256
-= sub
-{
-    state $handler  = Digest::SHA->can( 'sha256_hex' ); 
-
-    # avoid playing with stack games with potentially large
-    # chunks of data if possible: if the stack element is not
-    # a scalar ref then pass @_ unmolested.
-
-    if( ref $_[0] )
-    {
-        my $value   = shift;
-
-        $handler->( $$value )
-    }
-    else
-    {
-        &$handler
-    }
 };
 
 my $floor_mib
@@ -244,11 +223,10 @@ my $acquire_content
 my $acquire_header
 = sub
 {
-    my $entry   = splice @_, 1, 1;
-
+    my $field   = splice @_, 1, 1;
     my $res     = &$send_request;
 
-    $res->header( $entry )
+    $res->header( $field )
 };
 
 my $loop_request
@@ -298,12 +276,15 @@ my $loop_request
 my $upload_content
 = sub
 {
+$DB::single = 1;
+
     state $header_rx    = qr{^ /[^/]+/vaults/[^/]+/archives/(.*) $}x;
 
 	my ( $api, $name, $content, $desc ) = @_;
 
-	my $hash    = $api->t_hash( part_hash => $content );
-    my $sha     = $sha_256->( $content );
+	my $t_hash  = $api->t_hash( part_hash => $content );
+    my $sha     = sha256_hex $content;
+    my $hash    = unpack 'H*', $t_hash;
 
 	my $location = $api->$acquire_header
     (
@@ -694,7 +675,7 @@ sub multipart_upload_upload_part
     or croak "Mis-sized content: $length ($size)";
 
     my $hash    = $api->t_hash( part_hash => $content );
-    my $sha     = $sha_256->( $content );
+    my $sha     = sha256_hex $content;
     my $bytes   
     = do
     {

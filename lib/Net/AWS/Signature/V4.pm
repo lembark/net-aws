@@ -39,8 +39,6 @@ sub verbose
 
 sub debug
 {
-$DB::single = 1;
-
     local $Data::Dumper::Terse      = 1;
     local $Data::Dumper::Indent     = 1;
     local $Data::Dumper::Sortkeys   = 1;
@@ -56,7 +54,7 @@ $DB::single = 1;
 
     $message    =~ s{^}{# }gmx;
 
-    say $message;
+    say STDERR $message;
 
     return
 
@@ -224,8 +222,6 @@ my $c_heads
 my $canonical_hash
 = sub
 {
-$DB::single = 1;
-
     state $extractz = 
     [
         method =>
@@ -245,12 +241,12 @@ $DB::single = 1;
     }
     @$extractz;
 
-    my $hash        = sha256_hex join "\n" => @sign_fieldz;
+    my $string  = join "\n" => @sign_fieldz;
 
-    debug 'Canonical request hash:', $hash, \@sign_fieldz
+    debug "Canonical String:\n$string"
     if $verbose;
 
-    $hash
+    sha256_hex $string
 };
 
 my $sig_scope
@@ -321,9 +317,6 @@ my $authz_string
     {
         # notice the order of ymd and secret due to "$b, $a".
 
-        say "# Hashing: '$b', '$a'"
-        if $verbose;
-
         hmac_sha256 $b, $a
     }
     $secret, $ymd, $endpt, $serv, $cred_tag;
@@ -384,7 +377,8 @@ sub sign
 
     $req->header( Authorization => $authz );
 
-    debug 'Request:', $req->as_string;
+    debug 'Header:', ( split "\n\n" => $req->as_string, 2 )[0]
+    if $verbose;
 
     return
 }
