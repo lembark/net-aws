@@ -28,7 +28,7 @@ SKIP:
         or
         $::glacier->create_vault( $name )
         or
-        BAIL_OUT "Failed create vault: '$name' ($@_)";
+        die "Failed create vault: '$name' ($@_)";
 
         $name
     }
