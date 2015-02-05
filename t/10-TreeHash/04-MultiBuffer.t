@@ -8,8 +8,9 @@ use FindBin::libs;
 
 use Test::More;
 
-use Benchmark           qw( :hireswallclock );
-use Net::AWS::TreeHash  qw( :tree_hash      );
+use Benchmark           qw( :hireswallclock         );
+use Digest::SHA         qw( sha256                  );
+use Net::AWS::TreeHash  qw( tree_hash reduce_hash   );
 
 ########################################################################
 # package variables
@@ -65,7 +66,7 @@ do
     tree_hash ' ' x $size;
     my $t1  = Benchmark->new;
 
-    my $sec = 2 * $count * ( $t1->[0] - $t0->[0] );
+    my $sec = $count * ( $t1->[0] - $t0->[0] );
     my $est = 1 + int $sec;
 
     "Est. runtime: $est sec ($total bytes)"
@@ -75,70 +76,35 @@ do
 # package variables
 ########################################################################
 
-my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
-my $buffer  = ' ' x $size; # "\c@" x $size;
-
-for my $length ( length $buffer )
+my @part_hashz
+= map
 {
-    $size == $length
-    or BAIL_OUT "Mismatched buffer size: $length ($size)";
-}
-
-my $t_hash  = Net::AWS::TreeHash->new;
-
-for my $i ( 1 .. $count )
-{
-    my $t0  = Benchmark->new;
-
-    my $th  = $t_hash->part_hash( $buffer );
-
-    my $t1  = Benchmark->new;
-    my $dt  = timediff $t1, $t0;
-    my $str = timestr $dt;
-
-    note "Pass: $i ($str)";
-    my $expect  = tree_hash $buffer;
-    my $found   = $t_hash->[-1];
-
-    $th eq $expect
-    or do
-    {
-        fail "Invalid return: pass $i last t_hash != hash returned";
-        last
-    };
-
-    $expect == $found
-    or do
-    {
-        fail "Botched tree_hash at $i: $found ($expect)";
-        last
-    };
-
-    $t_hash->[-2]
-    ? $t_hash->[-2] ne $t_hash->[-1]
-    : 1
-    or do
-    {
-        local $" = ' ';
-
-        fail "Botched tree_hash: identical successive hashes (@{$t_hash}[-1,-2])";
-        last
-    };
-}
-continue
-{
+    state $letterz  = [ ( 'a' .. 'z' ), ( 'A' .. 'Z' ) ];
+    state $buffer   = ' ' x $size;
     state $i        = -1;
+    state $a        = '';
 
-    my $a   = $letterz[ ++$i % @letterz ];
+    substr $buffer, ++$i, 1, $letterz->[ $i % @$letterz ];
 
-    substr $buffer, $i, 1, $a;
+    my $t0      = Benchmark->new;
+    my $hash    = tree_hash $buffer;
+    my $t1      = Benchmark->new;
+
+    ok sha256( $buffer ) == $hash, "Hash $i";
+    note timestr timediff $t1, $t0;
+
+    $hash
 }
+( 1 .. $count );
 
-my $hashes  = @$t_hash;
-ok $hashes == $count, "Hash count: $hashes ($count)";
+my $t0      = Benchmark->new;
+my $found   = tree_hash \@part_hashz;
+my $t1      = Benchmark->new;
 
-$t_hash->final_hash
-and pass 'Final hash produced';
+my $expect  = reduce_hash @part_hashz;
+
+ok $found == $expect, 'Matching final hash';
+note timestr timediff $t1, $t0;
 
 done_testing;
 
