@@ -401,21 +401,11 @@ sub new
 
 sub final_hash
 {
-    my $api = shift;
-
-    $api->{ t_hash }->final_hash
-}
-
-sub t_hash
-{
     my $api     = shift;
-    my $name    = shift
-    or croak "Bogus t_hash: false method name";
+    my $hashz   = delete $api->{ hash_list }
+    or croak "Botched final_hash: api object lacks hash_list";
 
-    my $t_hash  = $api->{ t_hash }
-    or croak "Botched api object: missing t_hash";
-
-    $t_hash->$name( @_ )
+    tree_hash $hashz
 }
 
 ########################################################################
@@ -638,11 +628,15 @@ sub multipart_upload_init
     local @CARP_NOT = ( __PACKAGE__ );
 
     my $api     = shift;
+
+    $api->{ hash_list }
+    and croak "Bogus multipart_upload_init: api object has 'hash_list'";
+
+    $api->{ hash_list } = [];
+
     my $name    = shift or croak "false vault name";
     my $size    = shift or croak "false partition size";
     my $desc    = $sanitize_description->( @_, $name );
-
-    $api->t_hash( 'initialize' );
 
     $api->$send_request
     (
@@ -713,6 +707,8 @@ sub multipart_upload_upload_part
     $hash eq $found 
     or croak "Request returns invalid tree hash: '$found' ($hash)";
 
+    push @{ $api->{ hash_list } }, $hash;
+
     $hash
 }
 
@@ -730,7 +726,13 @@ sub multipart_upload_complete
     looks_like_number $size
     or croak "Non-numeric archive size: '$size'";
 
-	my $hash    = $api->t_hash( 'final_hash' );
+	my $hash    
+    = do
+    {
+        my $part_hashz  = delete $api->{ hash_list };
+
+        tree_hash @$part_hashz
+    };
 
 	my $location
     = $api->$acquire_header
@@ -769,6 +771,8 @@ sub multipart_upload_abort
 
     $found == $expect
     or croak "Invalid response code: '$found' ($expect)";
+
+    delete $api->{ hash_list };
 
     1
 }
