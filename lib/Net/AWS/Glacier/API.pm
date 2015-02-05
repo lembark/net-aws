@@ -29,7 +29,7 @@ use Net::AWS::TreeHash      qw( tree_hash tree_hash_hex );
 our $VERSION    = '0.16';
 $VERSION        = eval $VERSION;
 
-our @CARP_NOT   = ();
+our @CARP_NOT   = ( __PACKAGE__ );
 
 my  $verbose    = '';
 
@@ -390,11 +390,35 @@ sub new
     $api
 }
 
+sub initialize_hash
+{
+    my $api     = shift;
+    $api->{ hash_list }
+    or croak 'Bogus initial_hash: multipart upload in progress.';
+
+    $api->{ hash_list } = [];
+
+    return
+}
+
+sub add_part_hash
+{
+    my $api     = shift;
+    my $content = shift
+    or croak "Bogus part_hash: missing 'content' argument";
+    my $hashz   = $api->{ hash_list }
+    or croak "Botched part_hash: multipart upload not in progress.";
+
+    push @$hashz, tree_hash $content;
+
+    unpack 'H*', $hashz->[-1]
+}
+
 sub final_hash
 {
     my $api     = shift;
     my $hashz   = delete $api->{ hash_list }
-    or croak "Botched final_hash: api object lacks hash_list";
+    or croak "Botched final_hash: multipart upload not in progress.";
 
     tree_hash $hashz
 }
@@ -435,8 +459,6 @@ for
     *{ qualify_to_ref $name }
     = sub
     {
-        local @CARP_NOT = ( __PACKAGE__ );
-
         my $api     = shift;
         my $vault   = shift or croak "false vault name";
 
@@ -446,8 +468,6 @@ for
 
 sub list_vaults
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api = shift;
 
     $api->$loop_request
@@ -459,8 +479,6 @@ sub list_vaults
 
 sub set_vault_notifications
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $topic   = shift or croak "false sns topic";
@@ -509,11 +527,12 @@ for
 
 sub upload_file
 {
-$DB::single = 1;
-
-    local @CARP_NOT = ( __PACKAGE__ );
+    # default archive desc == path, which is lost when
+    # the file handle is passed.
 
     $_[3] // splice @_, 3, 1, $_[2];
+
+    # convert path on the stack to an open file handle.
 
     for( $_[2] )
     {
@@ -532,8 +551,6 @@ $DB::single = 1;
 
 sub delete_archive
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $arch_id = shift or croak "false archive id";
@@ -551,8 +568,6 @@ sub delete_archive
 
 sub maximum_partition_size
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     state $default  = 2 ** 30;
     state $curr     = $default;
 
@@ -583,8 +598,6 @@ sub maximum_partition_size
 
 sub calculate_multipart_upload_partsize
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $max_count   = 10_000;
 
     my $api     = shift;
@@ -604,15 +617,9 @@ sub calculate_multipart_upload_partsize
 
 sub multipart_upload_init
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
 
-    $api->{ hash_list }
-    and croak
-    "Bogus multipart_upload_init: existing multipart in progress";
-
-    $api->{ hash_list } = [];
+    $api->initialize_hash;
 
     my $name    = shift or croak "false vault name";
     my $size    = shift or croak "false partition size";
@@ -633,8 +640,6 @@ sub multipart_upload_init
 
 sub multipart_upload_upload_part
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $mult_id = shift or croak "false multi-part load id";
@@ -648,7 +653,7 @@ sub multipart_upload_upload_part
     $length == $size
     or croak "Mis-sized content: $length ($size)";
 
-    my $hash    = $api->t_hash( part_hash => $content );
+    my $hash    = $api->add_part_hash( $content );
     my $sha     = sha256_hex $content;
     my $bytes   
     = do
@@ -687,15 +692,11 @@ sub multipart_upload_upload_part
     $hash eq $found 
     or croak "Request returns invalid tree hash: '$found' ($hash)";
 
-    push @{ $api->{ hash_list } }, $hash;
-
     $hash
 }
 
 sub multipart_upload_complete 
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     state $arch_id_rx   = m{^ /[^/]+/vaults/[^/]+/archives/(.*) $}x;
 
     my $api     = shift;
@@ -728,8 +729,6 @@ sub multipart_upload_complete
 
 sub multipart_upload_abort
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     state $expect   = 204;
 
     my $api     = shift;
@@ -753,8 +752,6 @@ sub multipart_upload_abort
 
 sub multipart_upload_list_parts
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $mult_id = shift or croak "false multipart upload id";
@@ -768,8 +765,6 @@ sub multipart_upload_list_parts
 
 sub multipart_upload_list_uploads
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
 
@@ -786,8 +781,6 @@ sub multipart_upload_list_uploads
 
 sub initiate_archive_retrieval
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     state $empty    = [];
 
     my $api     = shift;
@@ -816,8 +809,6 @@ sub initiate_archive_retrieval
 
 sub initiate_inventory_retrieval
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     state $empty    = [];
     state $valid    = [ qw( JSON XML ) ];
 
@@ -855,8 +846,6 @@ sub initiate_inventory_retrieval
 
 sub describe_job
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $job_id  = shift or croak "false job id";
@@ -870,8 +859,6 @@ sub describe_job
 
 sub get_job_output
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $job_id  = shift or croak "false job id";
@@ -900,8 +887,6 @@ sub get_job_output
 
 sub list_jobs
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
 
@@ -914,15 +899,11 @@ sub list_jobs
 
 sub iterate_list_jobs
 {
-    local @CARP_NOT = ( __PACKAGE__ );
-
     state $limit_d      = 50;
     state $comp_d       = 'true';
     state $onepass_d    = '';
     state $prior        = '';
     state $count        =  0;
-
-    local @CARP_NOT = ( __PACKAGE__ );
 
     my $api     = shift;
     my $name    = shift or croak "false vault name";
