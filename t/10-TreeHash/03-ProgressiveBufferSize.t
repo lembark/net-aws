@@ -32,22 +32,26 @@ for my $size ( @buffsiz )
     my $a   = $letterz[ rand @letterz ];
     my $b   = $letterz[ rand @letterz ];
 
-    my $buff1   = $a x ( $size * MiB );
-    my $buff2   = $b x ( $size * MiB );
+    my $buff0   = $a x ( $size * MiB );
+    my $buff1   = $b x ( $size * MiB );
 
     my $t0      = Benchmark->new;
 
-    my $hash0   = tree_hash( $buff1 );
-    my $hash1   = tree_hash( $buff2 );
+    my $hash0   = tree_hash( $buff0 );
+    my $hash1   = tree_hash( $buff1 );
+    my $expect  = reduce_hash $hash0, $hash1;
 
     my $t1      = Benchmark->new;
 
-    my $found   = tree_hash [ $hash0, $hash1 ];
-    my $expect  = reduce_hash $hash0, $hash1;
+    my @hashz   = map { tree_hash $_ } ( $buff0, $buff1 );
+    my $found   = tree_hash \@hashz;
+
+    my $t2      = Benchmark->new;
 
     ok $found == $expect, "Hash $size MiB";
 
-    note timestr timediff $t1, $t0;
+    note 'buffer+reduce: ', timestr timediff $t1, $t0;
+    note 'tree_hash:     ', timestr timediff $t2, $t1;
 }
 
 done_testing;

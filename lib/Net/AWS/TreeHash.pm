@@ -11,7 +11,7 @@ use Const::Fast;
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
 use List::Util      qw( max             );
-use Scalar::Util    qw( blessed         );
+use Scalar::Util    qw( reftype         );
 use Symbol          qw( qualify_to_ref  );
 
 ########################################################################
@@ -103,9 +103,25 @@ sub import
 
 sub tree_hash
 {
-    ref $_[0]
-    ? $reduce_hash->( values $_[0] )
-    : &$buffer_hash
+    @_ > 1
+    and croak 'Bogus tree_hash: multiple arguments';
+
+    const my $type  => reftype $_[0];
+    
+    # caller gets back buffer_hash, reduce_hash, or death.
+
+    if( '' eq $type  )
+    {
+        &$buffer_hash
+    }
+    elsif( 'ARRAY' eq $type )
+    {
+        $reduce_hash->( values $_[0] )
+    }
+    else
+    {
+        croak "Bogus tree_hash: '$_' neither arrayref nor sting"
+    }
 }
 
 sub tree_hash_hex
@@ -125,7 +141,7 @@ Glacier API (version 2012-06-01)
 
 Usage:
 
-	use Net::Amazon::TreeHash qw( tree_hash );
+    use Net::Amazon::TreeHash qw( tree_hash );
 
     # simplest cases: compute the hash of a non-partitioned data.
 
@@ -167,6 +183,10 @@ internal COW mechanics minimizing the overhead.
 
 =head2 Exports
 
+Normal use will require tree_hash and possibly tree_hash_hex.
+Importing buffer_hash or reduce_hash is mainly for testing the
+interface.
+
 =over 4
 
 =item tree_hash
@@ -174,6 +194,9 @@ internal COW mechanics minimizing the overhead.
 Takes either a scalar buffer to hash (not a ref) or an arrayref
 of hashes to produce a final hash. Returns the binary sha256 result
 as-is (for hex see tree_hash_hex, below).
+
+This will croak if its first argument is neither an arrayref nor
+a non-ref scalar.
 
 =item tree_hash_hex
 
@@ -187,13 +210,7 @@ tree_hash for non-ref arguments).
 
 =item reduce_hash
 
-Takes a list (not a ref) of sha256 values and returns the tree_hash
-(called with an expanded list if tree_hash is called with a ref).
-
-=item
-
-buffer_hash and reduce_hash are available for export largely for
-testing. The interface is tree_hash & tree_hash_hex.
+Takes an arrayref of sha256 values and returns their tree_hash value.
 
 =back
 
@@ -201,17 +218,21 @@ testing. The interface is tree_hash & tree_hash_hex.
 
 =over 4
 
-=item This requires Perl 5.20.
-
-The important difference is handing Copy on Write for scalar assignment.
-Without COW the overhead of moving around the large buffers normally 
-associated with tree-hashing are prohibitively expensive.
-
-=item Speed
+=item Managing local buffer sizes
 
 The output of  "prove -v t/10-*" has benchmark output for various 
 sizes of buffer being hashed. This can be useful for determining the 
 appropriate buffer sizes in different environments.
+
+Running:
+
+    EXPENSIVE_TESTS=1 prove -v t/10-*;
+
+will include some -- probably excessively large -- buffers that
+can be used to determine likely swapping limits. Without the 
+EXPENSIVE_TESTS set they run shorter validation tests. Turning
+on "verbose" with prove displays timing information for each
+buffer size and for successive buffers.
 
 =back
 
@@ -235,5 +256,10 @@ Steven Lembark <lembark@wrkhors.com>
 
 =head1 BUGS
 
-=cut
+=over 4
 
+=item
+
+None, so far.
+
+=back

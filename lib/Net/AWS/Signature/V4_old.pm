@@ -135,12 +135,14 @@ sub _authorization
 
 	my $dt = _str_to_datetime( $req->header('Date') );
 	my $sts = $self->_string_to_sign( $req );
-	my $k_date    = hmac_sha256( $dt->strftime('%Y%m%d'), 'AWS4' . $self->{secret} );
-	my $k_region  = hmac_sha256( $self->{endpoint},        $k_date    );
-	my $k_service = hmac_sha256( $self->{service},         $k_region  );
-	my $k_signing = hmac_sha256( 'aws4_request',           $k_service );
+
+	my $k_date          = hmac_sha256( $dt->strftime('%Y%m%d'), 'AWS4' . $self->{secret} );
+	my $k_region        = hmac_sha256( $self->{endpoint},        $k_date    );
+	my $k_service       = hmac_sha256( $self->{service},         $k_region  );
+	my $k_signing       = hmac_sha256( 'aws4_request',           $k_service );
 
 	my $authz_signature = hmac_sha256_hex( $sts, $k_signing );
+
 	my $authz_credential = join '/', $self->{access_key_id}, $dt->strftime('%Y%m%d'), $self->{endpoint}, $self->{service}, 'aws4_request';
 	my $authz_signed_headers = join ';', sort { $a cmp $b } map { lc } $req->headers->header_field_names;
 

@@ -14,9 +14,10 @@ my $madness = '';
 
 use Net::AWS::TreeHash qw( tree_hash );
 
-ok __PACKAGE__->can( 'tree_hash' ), "'tree_hash' installed";
+__PACKAGE__->can( 'tree_hash' )
+or BAIL_OUT "'tree_hash' not installed";
 
-for my $length ( 1, 1024, 4096, MiB, 32 * MiB, 128 * MiB )
+for my $length ( 1, 1024, 4096, MiB )
 {
     my $buffer  = ' ' x $length;
     my $expect  = sha256 $buffer;
