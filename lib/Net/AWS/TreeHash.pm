@@ -4,7 +4,7 @@
 package Net::AWS::TreeHash;
 use v5.20;
 use autodie;
-use experimental 'lexical_subs';
+use experimental qw( lexical_subs autoderef );
 
 use Const::Fast;
 
@@ -27,8 +27,8 @@ my $empty   = sha256 '';
 # utility subs
 ########################################################################
 
-my $reduce_hash
-= sub
+const my $reduce_hash =>
+sub
 {
     # iterate reducing the pairs of 1MiB data units to a single value.
     # "2 > @_" intentionally returns undef for an empty list.
@@ -50,8 +50,8 @@ my $reduce_hash
     goto __SUB__
 };
 
-my $buffer_hash
-= sub
+const my $buffer_hash =>
+sub
 {
     state $format   = '(a' . 2**20 . ')*';
 
@@ -79,14 +79,15 @@ sub import
 
         for
         (
-            [ tree_hash     => \&tree_hash  ],
-            [ reduce_hash   => $reduce_hash ],
-            [ buffer_hash   => $buffer_hash ],
+            [ tree_hash     => \&tree_hash      ],
+            [ tree_hash_hex => \&tree_hash_hex  ],
+            [ reduce_hash   => $reduce_hash     ],
+            [ buffer_hash   => $buffer_hash     ],
         )
         {
             my ( $name, $ref ) = @$_;
 
-            grep { ":$name" eq $_ } @_
+            grep { "$name" eq $_ } @_
             or next;
 
             *{ qualify_to_ref $name, $caller  } = $ref;
@@ -100,52 +101,16 @@ sub import
 # methods
 ########################################################################
 
-########################################################################
-# construction
-
-sub construct
-{
-    my $proto   = shift;
-    bless [], blessed $proto || $proto
-}
-sub initialize
-{
-    my $t_hash  = shift;
-    @$t_hash    = ();
-    return
-}
-sub new
-{
-    my $t_hash  = &construct;
-    $t_hash->initialize( @_ );
-    $t_hash
-}
-
-########################################################################
-# caller partitions the input, adds hashes to the object.
-
 sub tree_hash
 {
-    blessed $_[0] and shift;
-
-    &$buffer_hash
+    ref $_[0]
+    ? $reduce_hash->( values $_[0] )
+    : &$buffer_hash
 }
 
-sub part_hash
+sub tree_hash_hex
 {
-    my ( $t_hash, $buffer ) = @_;
-
-    $t_hash->[ @$t_hash ] = $buffer_hash->( $buffer )
-}
-
-sub final_hash
-{
-    my $t_hash  = shift;
-
-    @$t_hash
-    or croak 'Bogus final_hash: no part hashes available';
-
-    $reduce_hash->( @$t_hash )
+    unpack 'H*', &tree_hash
 }
 
 # keep require happy
@@ -160,43 +125,109 @@ Glacier API (version 2012-06-01)
 
 Usage:
 
-	use Net::Amazon::TreeHash qw( :import );
+	use Net::Amazon::TreeHash qw( tree_hash );
 
     # simplest cases: compute the hash of a non-partitioned data.
 
     my $hash    = tree_hash( $buffer );
 
-    # for multi-part uploads accumulate the partition hashses and
-    # get a final one at the end.
+    # hash partitions (e.g. with glacier):
 
-	my $t_hash  = Net::Amazon::TreeHash->new();
+    my @part_hashes = ();
 
-    while( my $part = next_chunk_of_data )
+    for(;;)
     {
+        my $chunk   = read_next_chunk
+        or last;
 
-        my $hash    = $t_hash->part_hash( $part );
+        push @part_hashes, tree_hash $chunk;
 
-        send_partition ... $hash ... $part;
+        upload_partition $chunk, $part_hashes[-1];
     }
 
-    my $total_hash  = $t_hash->final_hash;
+    # the hash list is passed as an arrayref to distinguish it
+    # from a buffer being hashed.
 
-    send_final_message $total_hash;
+    my $final_hash  = tree_hash \@tree_hashes;
 
-    # at this point either let $t_hash go out of scope
-    # or call $t_hash->initialize to reset the list of
-    # partition hashes.
+    # sha256 results don't play nice with printf.
+    # either use  unpack 'H*', tree_hash ... ;
+    # or call tree_hash_hex
+
+    my $hash_hex    = tree_hash_hex $buffer;
+    my $hash_hex    = tree_hash_hex \@tree_hashes;
 
 =head1 DESCRIPTION
 
-Note: Perl-5.20 added internal Copy on Write semantics for strings.
-This obviates the need for pass-by-reference for the buffers: they
-are passed as strings with the internal COW mechanics minimizing
-the overhead.
+This module requires at least Perl v5.20, which added internal Copy on 
+Write semantics for strings.  This obviates the need for 
+pass-by-reference for the buffers: they are passed as strings with the 
+internal COW mechanics minimizing the overhead.
 
 
+=head2 Exports
+
+=over 4
+
+=item tree_hash
+
+Takes either a scalar buffer to hash (not a ref) or an arrayref
+of hashes to produce a final hash. Returns the binary sha256 result
+as-is (for hex see tree_hash_hex, below).
+
+=item tree_hash_hex
+
+Performs an unpack on the result of tree_hash, either with a buffer
+or list of hashes (see tree_hash, above).
+
+=item buffer_hash
+
+Takes a scalar (not a ref) and returns the tree-hash (called by 
+tree_hash for non-ref arguments).
+
+=item reduce_hash
+
+Takes a list (not a ref) of sha256 values and returns the tree_hash
+(called with an expanded list if tree_hash is called with a ref).
+
+=item
+
+buffer_hash and reduce_hash are available for export largely for
+testing. The interface is tree_hash & tree_hash_hex.
+
+=back
+
+=head1 NOTES
+
+=over 4
+
+=item This requires Perl 5.20.
+
+The important difference is handing Copy on Write for scalar assignment.
+Without COW the overhead of moving around the large buffers normally 
+associated with tree-hashing are prohibitively expensive.
+
+=item Speed
+
+The output of  "prove -v t/10-*" has benchmark output for various 
+sizes of buffer being hashed. This can be useful for determining the 
+appropriate buffer sizes in different environments.
+
+=back
 
 =head1 SEE ALSO
+
+=over 4
+
+=item Net::AWS::Glacier::API
+
+Which uses tree_hash.
+
+=item Treehash documentation at Amazon
+
+<http://docs.aws.amazon.com/amazonglacier/latest/dev/checksum-calculations.html>
+
+=back
 
 =head1 AUTHOR
 
