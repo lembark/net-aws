@@ -20,7 +20,7 @@ use Symbol          qw( qualify_to_ref                      );
 use File::Slurp     9999.19;
 
 use Net::AWS::Signature::V4;
-use Net::AWS::TreeHash      qw( :tree_hash :reduce_hash );
+use Net::AWS::TreeHash      qw( tree_hash tree_hash_hex );
 
 ########################################################################
 # package variables
@@ -278,13 +278,39 @@ my $upload_content
 {
 $DB::single = 1;
 
-    state $header_rx    = qr{^ /[^/]+/vaults/[^/]+/archives/(.*) $}x;
 
 	my ( $api, $name, $content, $desc ) = @_;
 
-	my $t_hash  = $api->t_hash( part_hash => $content );
+};
+
+my $upload_single_archive
+= sub
+{
+    state $header_rx    = qr{^ /[^/]+/vaults/[^/]+/archives/(.*) $}x;
+
+    my $api     = shift;
+    my $name    = shift or croak "false vault name";
+    my $archive = shift or croak "false content";
+    my $desc    = $sanitize_description->( @_, $name );
+
+    my $content
+    = do
+    {
+        if( ref $archive )
+        {
+            # open file handle
+
+            local $/;
+            readline $archive
+        }
+        else
+        {
+            $archive
+        }
+    };
+
+    my $hash    = tree_hash_hex $content;
     my $sha     = sha256_hex $content;
-    my $hash    = unpack 'H*', $t_hash;
 
 	my $location = $api->$acquire_header
     (
@@ -303,41 +329,6 @@ $DB::single = 1;
     or croak "Invalid location in response header: '$location'";
 
     $arch_id
-};
-
-my $upload_single_archive
-= sub
-{
-    my $api     = shift;
-    my $name    = shift or croak "false vault name";
-    my $archive = shift or croak "false content";
-    my $desc    = $sanitize_description->( @_, $name );
-
-    $api->t_hash( 'initialize' );
-
-    my $content
-    = do
-    {
-        if( ref $archive )
-        {
-            # open file handle
-
-            local $/;
-
-            readline $archive
-        }
-        else
-        {
-            $archive
-        }
-    };
-
-    $api->$upload_content
-    (
-        $name,
-        $content,
-        $desc
-    )
 };
 
 ########################################################################
@@ -503,12 +494,11 @@ sub set_vault_notifications
 # single-file archive operations
 ########################################################################
 # using the lexical sub leaves the call stack one level deep
-# for upload_archive* methods.
+# for upload* methods.
 
 for
 (
     [ upload_archive    => $upload_single_archive           ],
-    [ upload_file       => $upload_single_archive           ],
     [ initiate_job      => \&initiate_inventory_retrieval   ],
 )
 {
@@ -517,7 +507,7 @@ for
     *{ qualify_to_ref $name } = $ref;
 }    
 
-sub upload_archive
+sub upload_file
 {
 $DB::single = 1;
 
@@ -527,25 +517,14 @@ $DB::single = 1;
 
     for( $_[2] )
     {
-        $_       or croak "false path";
+        $_      or croak "false path";
 
         -f      or croak "non-existant: '$_'";
         -r _    or croak "non-readable: '$_'";
         -s _    or croak "empty file: '$_'";
 
-
-        my $content = File::Slurp::read_file
-        (
-            $_ =>
-            qw
-            (
-                err_mode    croak
-                binmode     :raw
-                scalar_ref  1
-            )
-        );
-
-        splice @_, 2, 1, $content;
+        open my $fh, '<', $_;
+        splice @_, 2, 1, $fh;
     }
 
     goto &$upload_single_archive
@@ -630,7 +609,8 @@ sub multipart_upload_init
     my $api     = shift;
 
     $api->{ hash_list }
-    and croak "Bogus multipart_upload_init: api object has 'hash_list'";
+    and croak
+    "Bogus multipart_upload_init: existing multipart in progress";
 
     $api->{ hash_list } = [];
 
@@ -726,13 +706,7 @@ sub multipart_upload_complete
     looks_like_number $size
     or croak "Non-numeric archive size: '$size'";
 
-	my $hash    
-    = do
-    {
-        my $part_hashz  = delete $api->{ hash_list };
-
-        tree_hash @$part_hashz
-    };
+	my $hash    = $api->final_hash;
 
 	my $location
     = $api->$acquire_header
