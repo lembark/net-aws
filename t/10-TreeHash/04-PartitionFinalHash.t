@@ -42,8 +42,8 @@ my $count
     }
     else
     {
-        diag "Using small buffer count to test memory footprint.";
-        diag "For more effecive, if longer, test set EXPENSEIVE_TESTS";
+        note "Using small buffer count to test memory footprint.";
+        note "For more effecive, if longer, test set EXPENSEIVE_TESTS";
 
         32
     }

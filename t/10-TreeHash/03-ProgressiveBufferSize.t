@@ -24,7 +24,7 @@ if( $ENV{ EXPENSIVE_TESTS } )
 }
 else
 {
-    diag "Skip tests beyond $buffsiz[-1] (EXPENSIVE_TESTS not set)";
+    note "Skip tests beyond $buffsiz[-1] (EXPENSIVE_TESTS not set)";
 }
 
 for my $size ( @buffsiz )

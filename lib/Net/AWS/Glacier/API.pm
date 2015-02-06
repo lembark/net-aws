@@ -17,8 +17,6 @@ use List::Util      qw( first                               );
 use Scalar::Util    qw( blessed reftype looks_like_number   );
 use Symbol          qw( qualify_to_ref                      );
 
-use File::Slurp     9999.19;
-
 use Net::AWS::Signature::V4;
 use Net::AWS::TreeHash      qw( tree_hash tree_hash_hex );
 
@@ -91,30 +89,6 @@ my $floor_mib
     or croak "Floor in MiB: '$size' < 1MiB ($exp)";
 
     2 ** $exp
-};
-
-my $generate_request_content
-= sub
-{
-    my $input   = shift;
-
-    if( 'SCALAR' eq reftype $input )
-    {
-        $input
-    }
-    else
-    {
-        File::Slurp::read_file
-        (
-            $input =>
-            qw
-            (
-                bin_mode    :raw
-                err_mode    carp
-                scalar_ref  1
-            )
-        )
-    }
 };
 
 ########################################################################
@@ -366,8 +340,6 @@ sub initialize
     (
         $key, $secret, $region, 'glacier'
     );
-    
-    my $t_hash  = Net::AWS::TreeHash->new;
 
     say "# Initialize: '$region' api"
     if $verbose;
@@ -377,7 +349,6 @@ sub initialize
 		region  => $region,
 		ua      => $ua,
 		sig     => $sig,
-        t_hash  => $t_hash,
 	);
 
 	return
@@ -1376,23 +1347,14 @@ credentials supplied by Amazon.
 
 =item Archive a single-file
 
-Two ways: pass in a file path or pre-load the data and pass a
-ref-to-scalar. Both of these return an exception or the archive_id 
+Two ways: pass in an open file handle or a sclar with the content 
+to upload: Both of these return an exception or the archive_id 
 value.
 
     my $archive_id  = $api->upload_archive
     (
         $vault_name,
         $archive_path
-        $description
-    );
-
-    my $archive_contents    = File::Slurp::read_file( ... );
-
-    my $archive_id  = $api->upload_archive_from_ref
-    (
-        $vault_name,
-        $archive_contents,
         $description
     );
 
