@@ -13,7 +13,7 @@ my @opz
     verbose
     write_archive
     write_inventory
-    download_completed
+    download_completed_job
     download_all_jobs
     upload_paths
 );
