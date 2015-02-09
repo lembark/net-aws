@@ -14,61 +14,57 @@ SKIP:
     $ENV{ TEST_GLACIER_ARCHIVE }
     or skip "TEST_GLACIER_ARCHIVE not set", 1;
 
-    my $vault   = "test-glacier-archives";
-
-    my $vault_data  = $::glacier->describe_vault( $vault ) 
-    or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
-
-    $vault_data->{ LastInventoryDate } 
-    or do
-    {
-        diag "Vault '$vault' lacks inventory\n",
-        explain $vault_data;
-
-        skip "Vault $vault has no inventory available", 1
-    };
-
-    my $job_id
+    my $vault
     = eval
     {
-        $::glacier->initiate_inventory_retrieval( $vault, 'JSON' );
+        my $name    = "test-glacier-archives";
 
+        my $found   
+        = first 
+        {
+            $_->{ VaultName } eq $name
+        }
+        $::glacier->list_vaults
+        or
+        $::glacier->create_vault( $name )
+        or
+        BAIL_OUT "Failed create vault: '$name' ($@_)";
+
+        $name
     }
-    or do
+    or BAIL_OUT "Error installing test vault: $@";
+
+    if( my $vault_data  = $::glacier->describe_vault( $vault ) )
     {
-        fail "initiate_inventory_retrieval: $@";
+        my $date = $vault_data->{ LastInventoryDate } 
+        or skip 
+        or do
+        {
+            diag "Vault '$vault' lacks inventory\n",
+            explain $vault_data;
 
-        skip 'No inventory job to analyze', 1
-    };
+            skip "Vault $vault has no inventory available", 1
+        };
 
-    pass 'initiate_inventory_retrieval';
+        diag "Vault inventory on '$a'";
 
-    my @found   
-    = eval
-    {
-        $::glacier->list_jobs( $vault )
+        my $job_id
+        = eval
+        {
+            $::glacier->initiate_inventory_retrieval( $vault, 'JSON' );
+        };
+
+        my $error   = $@;
+
+        note "Error:", $error   if $error;
+        note "JobID:", $job_id;
+
+        ok $job_id, "upload_archive returns job id ($job_id)";
     }
-    or do
+    else
     {
-        fail "list_jobs: $@";
-
-        skip 'No job list analyze', 1
-    };
-
-    my $job_statz
-    = first
-    {
-        $job_id eq $_->{ JobId }
+        BAIL_OUT "Vault '$vault' does not exist, unable to create";
     }
-    @found
-    or do
-    {
-        diag "Job list lacks job: '$job_id'\n", explain \@found;
-
-        fail "list_jobs does not return '$job_id'";
-
-        skip 'Job list lacks test job', 1
-    };
 };
 
 done_testing;
