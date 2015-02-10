@@ -37,7 +37,6 @@ SKIP:
     if( my $vault_data  = $::glacier->describe_vault( $vault ) )
     {
         my $date = $vault_data->{ LastInventoryDate } 
-        or skip 
         or do
         {
             diag "Vault '$vault' lacks inventory\n",
@@ -46,7 +45,7 @@ SKIP:
             skip "Vault $vault has no inventory available", 1
         };
 
-        diag "Vault inventory on '$a'";
+        diag "Vault inventory on '$date'";
 
         my $job_id
         = eval
@@ -57,9 +56,9 @@ SKIP:
         my $error   = $@;
 
         note "Error:", $error   if $error;
-        note "JobID:", $job_id;
 
-        ok $job_id, "upload_archive returns job id ($job_id)";
+        ok $job_id, "Inventory retrieval returns job id.";
+        note "JobID:", $job_id;
     }
     else
     {

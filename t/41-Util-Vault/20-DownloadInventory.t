@@ -34,36 +34,49 @@ SKIP:
         skip "Vault $vault has no inventory available", 1
     };
 
-    my @jobz
+    my $jobz
     = eval
     {
-        grep
+        my @jobz    = $::glacier->list_jobs( $vault )
+        or skip "No pending jobs", 1;
+
+        note "Pending jobs:\n", explain \@jobz;
+
+        @jobz       = grep { !! $_->{ Completed } } @jobz
+        or skip "No completed jobs", 1;
+
+        my $n       = @jobz;
+        note "Completed jobs: $n";
+
+        my @jobz  
+        = grep 
         {
             'InventoryRetrieval' eq $_->{ Action }
         }
-        $::glacier->list_jobs( $vault )
+        @jobz
+        or skip "No inventory jobs", 1;
+
+        my $n       = @jobz;
+        note "Inventory jobs: $n";
+
+        \@jobz
     }
     or do
     {
         fail "list_jobs: $@";
-
-        skip "No inventory jobs available ($@)", 1
+        skip "Failed list_jobs available ($@)", 1
     };
 
-    my @compz
-    = grep
+    for( @$jobz )
     {
-        $_->{ Completed }
-    }
-    @jobz
-    or do
-    {
-        skip 'No completed inventory jobs available', 1
-    };
+        my $job_id  = $_->{ JobId }
+        or do
+        {
+            fail "Bogus job: lacks 'JobId'";
+            diag explain $_;
 
-    for( @compz )
-    {
-        my $job_id  = $_->{ JobId };
+            next
+        };
 
         my $output  
         = eval 
@@ -80,6 +93,8 @@ SKIP:
             my $type    = reftype $struct->{ ArchiveList };
 
             ok 'ARRAY' eq $type , "ArchiveList is '$type' (ARRAY)";
+
+            1
         }
         or do
         {
@@ -87,9 +102,9 @@ SKIP:
 
             next
         };
-
     }
 }
+
 done_testing;
 
 0

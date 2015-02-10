@@ -16,47 +16,21 @@ SKIP:
 
     my $vault   = "test-glacier-archives";
 
-    my $vault_data  = $::glacier->describe_vault( $vault ) 
+    $::glacier->describe_vault( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
-    $vault_data->{ LastInventoryDate } 
-    or do
-    {
-        diag "Vault '$vault' lacks inventory\n",
-        explain $vault_data;
-
-        skip "Vault $vault has no inventory available", 1
-    };
-
-    my $job_id
-    = eval
-    {
-        $::glacier->initiate_inventory_retrieval( $vault, 'JSON' );
-
-        pass 'initiate_inventory_retrieval';
-
-        1
-    }
-    or do
-    {
-        fail "initiate_inventory_retrieval: $@";
-
-        skip 'No inventory job to analyze', 1
-    };
-
-    my @found   
+    my @pendz   
     = eval
     {
         $::glacier->list_jobs( $vault )
-    }
-    or do
-    {
-        fail "list_jobs: $@";
-
-        skip 'No job list analyze', 1
     };
 
+    $@
+    ? fail "list_jobs: $@"
+    : pass "list_jobs"
+    ;
 
+    note "Job data:\n", explain \@pendz;
 };
 
 done_testing;

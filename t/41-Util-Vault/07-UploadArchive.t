@@ -43,13 +43,18 @@ SKIP:
         : diag "Vault '$vault' has no inventory", explain $vault_data
         ;
 
-        my $arch_id = eval { $glacier->upload_archive( $vault, $0 ) };
+        my $arch_id
+        = eval
+        {
+            open my $fh, '<', $0;
+            $glacier->upload_archive( $vault, $fh, $0 )
+        };
         my $error   = $@;
 
         note "Error:", $error   if $error;
-        note "ArchID:", $arch_id;
 
-        ok $arch_id, "upload_archive returns archive id ($arch_id)";
+        ok $arch_id, "upload_archive returns archive id.";
+        note 'ArchiveID: ', $arch_id;
     }
     else
     {
