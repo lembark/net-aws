@@ -25,13 +25,13 @@ SKIP:
 
         my $message = "Delete test vault: '$name'";
 
-        eval
-        {
-            $glacier->delete_vault( $name ); 
-
-            pass $message;
-        }
-        or fail $message;
+#        eval
+#        {
+#            $glacier->delete_vault( $name ); 
+#
+#            pass $message;
+#        }
+#        or fail $message;
     }
 }
 
