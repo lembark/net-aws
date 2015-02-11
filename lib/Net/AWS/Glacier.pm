@@ -360,6 +360,8 @@ sub download_all_jobs
 
 sub upload_paths
 {
+$DB::single = 1;
+
     my $glacier = shift;
     my $vault   = shift or croak "false vault name";
 
@@ -375,18 +377,12 @@ sub upload_paths
         : $_
         ;
 
-        $desc   ||= $path;
-
         $path2arch{ $path } 
         = eval
         {
-            -e $path    or die "Non-existant: '$path'\n";
-            -r _        or die "Un-readable: '$path'\n";
-            -s _        or die "Empty: '$path'\n";
-
             $glacier->upload_archive( $vault, $path, $desc )
         }
-        or carp $@; 
+        or carp "'$path', $@"; 
     }
 
     wantarray   // return;

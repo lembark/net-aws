@@ -1,0 +1,71 @@
+use v5.20;
+use autodie;
+use FindBin::libs;
+use FindBin::libs   qw( realbin base=t subdir=lib subonly   );
+
+use List::Util      qw( first   );
+use Scalar::Util    qw( reftype );
+
+use Test::More;
+use Test::GlacierUtil;
+
+SKIP:
+{
+    $ENV{ AWS_GLACIER_FULL }
+    or skip "AWS_GLACIER_FULL not set", 1;
+
+    my $vault
+    = eval
+    {
+        my $name    = "test-glacier-archives";
+
+        my $found   
+        = first 
+        {
+            $_->{ VaultName } eq $name
+        }
+        $::glacier->list_vaults
+        or
+        $::glacier->create_vault( $name )
+        or
+        die "Failed create vault: '$name' ($@_)";
+
+        $name
+    }
+    or BAIL_OUT "Error installing test vault: $@";
+
+    if( my $vault_data  = $::glacier->describe_vault( $vault ) )
+    {
+        my @pathz   = glob 't/0*.t';
+        my @idz     
+        = eval
+        {
+            $::glacier->upload_paths( @pathz );
+        };
+
+        if( $@ )
+        {
+            fail "Upload paths: $@";
+        }
+        elsif( @idz == @pathz )
+        {
+            pass 'Path and ID counts match';
+        }
+        else
+        {
+            fail 'Upload paths: mismatched count';
+
+            diag "Paths:\n", explain \@pathz;
+            diag "IDs:\n", explain \@idz;
+        }
+    }
+    else
+    {
+        fail "Vault '$vault' does not exist";
+    }
+};
+
+done_testing;
+
+0
+__END__
