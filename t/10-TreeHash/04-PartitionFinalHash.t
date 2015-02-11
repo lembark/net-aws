@@ -29,7 +29,7 @@ my $count
 
         $env
     }
-    elsif( $ENV{ EXPENSIVE_TESTS } )
+    elsif( $ENV{ AWS_GLACIER_FULL } )
     {
         # i.e., roughly 1/2 TB.
         # each 128MiB buffer has 256 sha256 hash values computed.

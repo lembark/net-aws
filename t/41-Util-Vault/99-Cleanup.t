@@ -11,8 +11,8 @@ use Test::GlacierUtil;
 
 SKIP:
 {
-    $ENV{ TEST_GLACIER_ARCHIVE }
-    or skip "TEST_GLACIER_ARCHIVE not set", 1;
+    $ENV{ AWS_GLACIER_FULL }
+    or skip "AWS_GLACIER_FULL not set", 1;
 
     for( $glacier->list_vaults )
     {
@@ -24,14 +24,6 @@ SKIP:
         or next;
 
         my $message = "Delete test vault: '$name'";
-
-#        eval
-#        {
-#            $glacier->delete_vault( $name ); 
-#
-#            pass $message;
-#        }
-#        or fail $message;
     }
 }
 

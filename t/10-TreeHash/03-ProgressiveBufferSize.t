@@ -16,15 +16,15 @@ my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
 my @buffsiz = ( 1, 2, 4, 8, 32, 64, 128 );
 my $last    = $buffsiz[-1];
 
-if( $ENV{ EXPENSIVE_TESTS } )
+if( $ENV{ AWS_GLACIER_FULL } )
 {
     state $big  = [ map { $last * 2 ** $_ } ( 1 .. 3 ) ];
-    diag "Adding $big->[0] .. $big->[-1] (EXPENSIVE_TESTS set)";
+    diag "Adding $big->[0] .. $big->[-1] (AWS_GLACIER_FULL set)";
     push @buffsiz, @$big;
 }
 else
 {
-    note "Skip tests beyond $buffsiz[-1] (EXPENSIVE_TESTS not set)";
+    note "Skip tests beyond $buffsiz[-1] (AWS_GLACIER_FULL not set)";
 }
 
 for my $size ( @buffsiz )

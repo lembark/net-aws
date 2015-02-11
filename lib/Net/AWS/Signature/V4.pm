@@ -24,7 +24,7 @@ our @CARP_NOT   = ( __PACKAGE__ );
 
 sub ALGORITHM() { 'AWS4-HMAC-SHA256' }
 
-my $verbose     = 1;
+my $verbose     = '';
 
 ########################################################################
 # utility subs

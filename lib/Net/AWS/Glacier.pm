@@ -54,8 +54,8 @@ sub verbose
 
 for
 (
-    [ qw( has_completedjobs     true    ) ],
-    [ qw( has_pending_jobs      false   ) ]
+    [ qw( has_pending_jobs      false   ) ],
+    [ qw( has_completed_jobs    true    ) ],
 )
 {
     my ( $name, $status ) = @$_;
@@ -70,7 +70,7 @@ for
         # "onepass" == true
 
         my ( undef, $jobz ) 
-        = $glacier->chunk_list_jobs( $vault, 0, $status, 1 );
+        = $glacier->iterate_list_jobs( $vault, 0, $status, 1 );
 
         # i.e., true if there is anything out there
 
@@ -80,8 +80,8 @@ for
 
 for
 (
-    [ qw( list_completed_jobs    true    ) ],
-    [ qw( list_pending_jobs     false   ) ]
+    [ qw( list_pending_jobs     false   ) ],
+    [ qw( list_completed_jobs   true    ) ],
 )
 {
     my ( $name, $status ) = @$_;
@@ -100,7 +100,7 @@ for
             # "onepass" == false
 
             my ( $cont, $found ) 
-            = $glacier->chunk_list_jobs( $name, $limit, $status );
+            = $glacier->iterate_list_jobs( $name, $limit, $status );
 
             push @jobz, @$found;
 

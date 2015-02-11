@@ -11,8 +11,8 @@ use Test::GlacierAPI;
 
 SKIP:
 {
-    $ENV{ TEST_GLACIER_ARCHIVE }
-    or skip "TEST_GLACIER_ARCHIVE not set", 1;
+    $ENV{ AWS_GLACIER_FULL }
+    or skip "AWS_GLACIER_FULL not set", 1;
 
     my $vault
     = eval

@@ -7,7 +7,8 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::GlacierAPI;
+use Test::Deep;
+use Test::GlacierUtil;
 
 SKIP:
 {
@@ -19,7 +20,7 @@ SKIP:
     $::glacier->describe_vault( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
-    my @pendz   
+    my @pass1   
     = eval
     {
         $::glacier->list_jobs( $vault )
@@ -30,7 +31,21 @@ SKIP:
     : pass "list_jobs"
     ;
 
-    note "Job data:\n", explain \@pendz;
+    do
+    {
+        my @expect  = grep { ! $_->{ Completed } } @pass1;
+        my @found   = $::glacier->list_pending_jobs( $vault );
+
+        cmp_deeply \@found, \@expect, 'Pending Jobs';
+    };
+
+    do
+    {
+        my @expect  = grep {   $_->{ Completed } } @pass1;
+        my @found   = $::glacier->list_completed_jobs( $vault );
+
+        cmp_deeply \@found, \@expect, 'Completed Jobs';
+    };
 };
 
 done_testing;
