@@ -252,16 +252,17 @@ my $upload_content
 {
 $DB::single = 1;
 
+    # anything larger than 4GB requires a mutipart upload.
+    # anything larger than 128GB should use multipart upload.
 
 	my ( $api, $name, $content, $desc ) = @_;
+
 
 };
 
 my $upload_single_archive
 = sub
 {
-    state $header_rx    = qr{^ /[^/]+/vaults/[^/]+/archives/(.*) $}x;
-
     my $api     = shift;
     my $name    = shift or croak "false vault name";
     my $archive = shift or croak "false content";
@@ -270,12 +271,18 @@ my $upload_single_archive
     my $content
     = do
     {
-        if( ref $archive )
+        my $type    = reftype $archive;
+
+        if( 'GLOB' eq $type )
         {
             # open file handle
 
             local $/;
             readline $archive
+        }
+        elsif( $type )
+        {
+            croak "Unhandled structure: '$type' ($archive)";
         }
         else
         {
@@ -299,8 +306,22 @@ my $upload_single_archive
 		$content
 	);
 
-	my ( $arch_id ) = $location =~ $header_rx 
-    or croak "Invalid location in response header: '$location'";
+    my $arch_id
+    = do
+    {
+        my @partz   = split '/' => $location;
+
+        'vaults'    eq $partz[2]
+        or croak "Unusable location: missing 'vaults', $location";
+
+        $name       eq $partz[3]
+        or croak "Unusable location: missing '$name', $location";
+
+        'archives'  eq $partz[4]
+        or croak "Unusable location: missing 'archives', $location";
+
+        $partz[-1]
+    };
 
     $arch_id
 };
@@ -507,11 +528,19 @@ sub upload_file
 
     for( $_[2] )
     {
+        state $max  = 2 ** 32 - 1;
+
         $_      or croak "false path";
 
-        -f      or croak "non-existant: '$_'";
+        -e _    or croak "non-existant: '$_'";
+        -f _    or croak "non-file: '$_'";
         -r _    or croak "non-readable: '$_'";
-        -s _    or croak "empty file: '$_'";
+
+        my $size = -s _
+        or croak "empty file: '$_'";
+
+        $size > $max
+        and croak "Oversize file: '$_' (> $max), use multipart upload";
 
         open my $fh, '<', $_;
         splice @_, 2, 1, $fh;
