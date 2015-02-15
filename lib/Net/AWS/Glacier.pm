@@ -360,8 +360,6 @@ sub download_all_jobs
 
 sub upload_paths
 {
-$DB::single = 1;
-
     my $glacier = shift;
     my $vault   = shift or croak "false vault name";
 
@@ -380,7 +378,17 @@ $DB::single = 1;
         $path2arch{ $path } 
         = eval
         {
-            $glacier->upload_archive( $vault, $path, $desc )
+            -e $path    or die "Non-existant: '$path'";
+            -f _        or die "Non-file: '$path'";
+            -r _        or die "Non-readable: '$path'";
+
+            my $bytes   = -s _ or die "Empty: 'path'";
+
+            $bytes < 2**32 -1 
+            or die "Requires multi-part upload: '$path' ($bytes)";
+
+            open my $fh, '<', $path;
+            $glacier->upload_archive( $vault, $fh, $desc )
         }
         or carp "'$path', $@"; 
     }
