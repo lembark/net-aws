@@ -47,6 +47,8 @@ SKIP:
 
         my $content = qx{ cat $0 };
 
+$DB::single = 1;
+
         my $arch_id 
         = eval { $glacier->upload_archive( $vault, $content ) };
 

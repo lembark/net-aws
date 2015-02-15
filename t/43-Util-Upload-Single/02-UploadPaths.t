@@ -14,11 +14,11 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
+    my $name    = "test-glacier-archives";
+
     my $vault
     = eval
     {
-        my $name    = "test-glacier-archives";
-
         my $found   
         = first 
         {
@@ -37,26 +37,24 @@ SKIP:
     if( my $vault_data  = $::glacier->describe_vault( $vault ) )
     {
         my @pathz   = glob 't/0*.t';
-        my @idz     
+        my %path2arch
         = eval
         {
-            $::glacier->upload_paths( @pathz );
+            $::glacier->upload_paths( $name => @pathz );
         };
+
+        note "Upload results:\n", explain \%path2arch;
 
         if( $@ )
         {
             fail "Upload paths: $@";
         }
-        elsif( @idz == @pathz )
-        {
-            pass 'Path and ID counts match';
-        }
         else
         {
-            fail 'Upload paths: mismatched count';
-
-            diag "Paths:\n", explain \@pathz;
-            diag "IDs:\n", explain \@idz;
+            $path2arch{ $_ }
+            ? pass "Has archive id: '$_'"
+            : fail "Lacks archive id: '$_'"
+            for @pathz;
         }
     }
     else
