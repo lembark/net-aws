@@ -21,8 +21,6 @@ use Symbol          qw( qualify_to_ref  );
 our $VERSION = '0.80';
 $VERSION = eval $VERSION;
 
-my $empty   = sha256 '';
-
 ########################################################################
 # utility subs
 ########################################################################
@@ -54,9 +52,9 @@ const my $buffer_hash =>
 sub
 {
     state $format   = '(a' . 2**20 . ')*';
+    my $buffer      = shift;
 
-    my $buffer  = shift;
-    my $size    = length $buffer
+    length $buffer
     or return;
 
     $reduce_hash->
