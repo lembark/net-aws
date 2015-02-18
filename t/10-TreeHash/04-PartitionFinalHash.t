@@ -84,7 +84,7 @@ my @part_hashz
     state $i        = -1;
     state $a        = '';
 
-    substr $buffer, ++$i, 1, $letterz->[ $i % @$letterz ];
+    substr $buffer, ( ++$i % $size ), 1, $letterz->[ $i % @$letterz ];
 
     my $t0      = Benchmark->new;
     my $hash    = tree_hash $buffer;
