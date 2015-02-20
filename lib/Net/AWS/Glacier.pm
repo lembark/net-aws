@@ -378,17 +378,7 @@ sub upload_paths
         $path2arch{ $path } 
         = eval
         {
-            -e $path    or die "Non-existant: '$path'";
-            -f _        or die "Non-file: '$path'";
-            -r _        or die "Non-readable: '$path'";
-
-            my $bytes   = -s _ or die "Empty: 'path'";
-
-            $bytes < 2**32 -1 
-            or die "Requires multi-part upload: '$path' ($bytes)";
-
-            open my $fh, '<', $path;
-            $glacier->upload_archive( $vault, $fh, $desc )
+            $glacier->upload_archive( $vault, $path, $desc )
         }
         or carp "'$path', $@"; 
     }

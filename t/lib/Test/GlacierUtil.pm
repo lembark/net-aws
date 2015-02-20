@@ -38,9 +38,10 @@ sub import
 
     my $caller  = caller;
 
-    diag "Install: Util object -> $caller";
+    note "Install: Util object -> $caller";
 
-    *{ qualify_to_ref glacier => $caller } = \( $madness->new( @credz ) );
+    *{ qualify_to_ref glacier => $caller } 
+    = \( $madness->new( @credz ) );
 
     return
 }

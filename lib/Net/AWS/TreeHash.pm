@@ -52,7 +52,7 @@ const my $buffer_hash =>
 sub
 {
     state $format   = '(a' . 2**20 . ')*';
-    my $buffer      = shift;
+    const my $buffer => shift;
 
     length $buffer
     or return;
