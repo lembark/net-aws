@@ -15,45 +15,13 @@ my $tmpdir  = './tmp';
 my $base    = 'inventory.json';
 my $path    = "$tmpdir/$base";
 
-my $inventory_job
+my $download_job
 = sub
 {
     my $glacier = shift;
 
     for(;;)
     {
-        state $job_id   = '';
-
-        my @jobz
-        = grep
-        {
-            'InventoryRetrieval' eq $_->{ Action }
-        }
-        $glacier->list_jobs( $vault )
-        or do
-        {
-            diag 'Submit inventory job...';
-
-            $job_id
-            ||= $glacier->initiate_inventory_retrieval( $vault );
-
-            sleep 900;
-        };
-
-        my $job
-        = first
-        {
-            $_->{ Completed }
-        }
-        @jobz
-        or do
-        {
-            diag 'Waiting for inventory...';
-
-            sleep 900;
-        };
-
-        return $job->{ JobId };
     }
 };
 
@@ -62,37 +30,19 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    for( $tmpdir )
+    for( $path )
     {
-        -e || mkdir $_, 0777
-        or BAIL_OUT "Failed mkdir: '$_', $!";
-    }
+        -e      
+        or skip "No inventory: use 01-AcquireInventory.t ($path)";
 
-    my $vault
-    = eval
-    {
-        my $found   
-        = first 
-        {
-            $_->{ VaultName } eq $vault
-        }
-        $::glacier->list_vaults
-        or
-        $::glacier->create_vault( $vault )
-        or
-        die "Failed create vault: '$vault' ($@_)";
-
-        $vault
+        -s _    
+        or skip "Empty inventory: use 01-AcquireInventory.t ($path)";
     }
-    or BAIL_OUT "Error installing test vault: '$vault', $@";
 
     for my $vault_data  ( $::glacier->describe_vault( $vault ) )
     {
         $vault_data
-        or BAIL_OUT "Error describe_vault: '$vault', $@";
-
-        $vault_data->{ LastInventoryDate }
-        or skip "$vault lacks inventory", 1;
+        or SKIP "Missing vault: '$vault'";
     }
 
     my $job_id  = $glacier->$inventory_job;
