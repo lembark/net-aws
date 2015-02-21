@@ -14,19 +14,7 @@ sub MiB()   { 2 ** 20 };
 use Net::AWS::TreeHash qw( tree_hash reduce_hash );
 
 my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
-my @buffsiz = map { 2 ** $_ } ( 0 .. 8 );
-my $last    = $buffsiz[-1];
-
-if( $ENV{ AWS_GLACIER_FULL } )
-{
-    state $big  = [ map { $last * 2 ** $_ } ( 1 .. 4 ) ];
-    diag "Adding $big->[0] .. $big->[-1] (AWS_GLACIER_FULL set)";
-    push @buffsiz, @$big;
-}
-else
-{
-    note "Skip tests beyond $buffsiz[-1] (AWS_GLACIER_FULL not set)";
-}
+my @buffsiz = map { 2 ** $_ } ( 0 .. 9 );
 
 for my $size ( @buffsiz )
 {
