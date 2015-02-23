@@ -12,6 +12,7 @@ use JSON::XS;
 use Object::Trampoline;
 
 use File::Basename  qw( basename dirname        );
+use List::Util      qw( first                   );
 use Scalar::Util    qw( blessed                 );
 use Symbol          qw( qualify_to_ref          );
 
@@ -173,6 +174,111 @@ $DB::single = 1;
     };
 }
 
+sub retrieve_inventory
+{
+    my $glacier = shift;
+    my $vault   = shift or croak 'false vault name';
+    my $format  = shift || 'JSON';
+
+    # write_inventory destination is left on the stack.
+
+    my $vault_data  = $glacier->describe_vault( $vault );
+
+    $vault_data->{ LastInventoryDate }
+    or die "Lacks Inventory: '$vault'.\n";
+    
+    # at this point the vault appears to have an inventory.
+
+    local $glacier->{ vault_data }  = $vault_data;
+
+    $glacier->list_inventory_jobs( $vault, $format )
+    or do
+    {
+        say "Initiate inventory retrieval ($vault)"
+        if $verbose;
+
+        my $job_id
+        = $glacier->initiate_inventory_retrieval
+        (
+            $vault,
+            $format
+        );
+
+        say "Waiting for inventory: $job_id"
+        if $verbose;
+
+        sleep 60;
+    };
+
+    my $jobz    = ();
+
+    for(;;)
+    {
+        $jobz = $glacier->list_completed_inventory_jobs
+        (
+            $vault,
+            $format
+        )
+        and last;
+        
+        say 'Waiting for inventory job completion'
+        if $verbose;
+
+        sleep 900;
+        next;
+    }
+
+    my $job_id = $jobz->[0]{ JobId };
+
+    $glacier->write_inventory( $vault, $job_id, @_ )
+}
+
+sub list_completed_inventory_jobs
+{
+    my $glacier = shift;
+    my $vault   = shift or croak 'false vault name';
+    my $format  = shift || 'JSON';
+
+    my @jobz
+    = sort
+    {
+        $b->{ CompletionDate }
+        <=>
+        $a->{ CompletionDate }
+    }
+    grep
+    {
+        $_->{ Completed }
+    }
+    $glacier->list_inventory_jobs( $vault, $format )
+    or
+    return;
+
+    wantarray
+    ?  @jobz
+    : \@jobz
+}
+
+sub list_inventory_jobs
+{
+    my $glacier = shift;
+    my $vault   = shift or croak 'false vault name';
+    my $format  = shift || 'JSON';
+
+    my @jobz
+    = grep
+    {
+        'InventoryRetrieval' eq $_->{ Action }
+        and
+        $format eq $_->{ InventoryRetrievalParameters }{ Format }
+    }
+    $glacier->list_jobs( $vault );
+
+    wantarray
+    ?  @jobz
+    : \@jobz
+}
+
 sub write_inventory
 {
     local @CARP_NOT = ( __PACKAGE__ );
@@ -183,55 +289,64 @@ $DB::single = 1;
     my $vault   = shift or croak 'false vault name';
     my $job_id  = shift or croak 'false job_id';
     my $dest    = shift || './';
-    my $desc    = shift // '';
 
-    my $struct 
-    = eval
+    my $date
+    = do
     {
-        # extracting the struct is expensive but saves time over
-        # writing a botched inventory or discovering there isn't
-        # date; having the struct beats parsing JSON with a regex.
+        # this croaks on a bogus vault.
 
-        my $content = $glacier->get_job_output( $vault, $job_id );
+        my $statz
+        = $glacier->{ vault_data }
+        || $glacier->describe_vault( $vault );
 
-        decode_json $content
+        $statz->{ LastInventoryDate }
     }
-    or croak "Failed write_inventory: botched json, $@";
+    or die "Lacks inventory: '$vault'\n";
 
-    my $date    = $struct->{ InventoryDate }
-    or croak "Failed write_inventory: json lacks 'InventoryDate'";
-
-    my $base    = "inventory-$vault-$date.json.gz";
-    my $path    = catfile $dest, $base;
-
-    -e $path
-    and do
+    my $format
+    = do
     {
-        say "Skip existing: '$path'";
+        # this croaks on a bogus job_id.
 
-        return
+        my $statz   = $glacier->describe_job( $vault, $job_id );
+
+        $statz->{ Completed }
+        or die "Incomplete: '$job_id'\n";
+
+        say "Inventory size: $statz->{ InventorySizeInBytes }"
+        if $verbose;
+
+        lc $statz->{ InventoryRetrievalParameters }{ Format }
     };
 
-    say "Writing inventory: '$path'";
+    # at this point there seems to be something retirevable.
+    # check that it hasn't already been downloaded.
+
+    my $base    = join '_' => 'inventory', $vault, "$date.$format.gz";
+    my $path    = catfile $dest, $base;
+
+    -s $path
+    and die "Existing: '$path'\n";
+
+    say "Writing inventory: '$path'"
+    if $verbose;
 
     eval
     {
-        # helluva lot easier to read the stuff this way, minimal
-        # difference in zipped size.
 
-        state $coder    = JSON::XS->new->ascii->pretty;
+        my $content = $glacier->get_job_output( $vault, $job_id );
 
-        open my $fh, '-|', "gzip -9 > $path";
+        open my $fh, '|-', "gzip -9 > $path";
 
-        print $fh $coder->encode( $struct );
+        print $fh $content;
 
         close $fh
     }
-    or do 
+    or do
     {
-        unlink $path;
+        -e $path && unlink $path;
 
-        croak "Failed writing inventory: $@"
+        die "Failed write: $@\n"
     };
 
     $path

@@ -15,60 +15,6 @@ my $tmpdir  = './tmp';
 my $base    = 'inventory.json';
 my $path    = "$tmpdir/$base";
 
-my $inventory_job
-= sub
-{
-    my $glacier = shift;
-
-    for(;;)
-    {
-        state $submit = '';
-
-        my @jobz
-        = grep
-        {
-            'InventoryRetrieval' eq $_->{ Action }
-            and
-            'JSON' eq $_->{ InventoryRetrievalParameters }{ Format };
-        }
-        $glacier->list_jobs( $vault )
-        or do
-        {
-            diag 'Submit inventory.';
-
-            $submit 
-            ||= eval
-            {
-                $glacier->initiate_inventory_retrieval
-                (
-                    $vault,
-                    'JSON'
-                )
-            }
-            or BAIL_OUT "Unable to sumbit inventory job: $@";
-
-            sleep 60;
-            next
-        };
-
-        my $job
-        = first
-        {
-            $_->{ Completed }
-        }
-        @jobz
-        or do
-        {
-            diag 'Waiting for inventory.';
-
-            sleep 900;
-            next
-        };
-
-        return $job->{ JobId };
-    }
-};
-
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
@@ -80,57 +26,26 @@ SKIP:
         or BAIL_OUT "Failed mkdir: '$_', $!";
     }
 
-    my $vault
+    my $path    
     = eval
     {
-        my $found   
-        = first 
-        {
-            $_->{ VaultName } eq $vault
-        }
-        $::glacier->list_vaults
-        or
-        $::glacier->create_vault( $vault )
-        or
-        die "Failed create vault: '$vault' ($@_)";
-
-        $vault
-    }
-    or BAIL_OUT "Error installing test vault: '$vault', $@";
-
-    for my $vault_data  ( $::glacier->describe_vault( $vault ) )
-    {
-        $vault_data
-        or BAIL_OUT "Error describe_vault: '$vault', $@";
-
-        $vault_data->{ LastInventoryDate }
-        or skip "$vault lacks inventory", 1;
-    }
-
-    my $job_id  = $glacier->$inventory_job;
-
-    my $output  = $glacier->get_job_output( $vault => $job_id )
-    or do
-    {
-        fail "Failed download $job_id output";
-        skip "No inventory for download", 1
+        $glacier->retrieve_inventory( $vault );
     };
 
-    eval { decode_json $output }
-    or do
+    if( $path )
     {
-        fail "Decode inventory: $@";
-        skip "Unusable inventory.", 1
-    };
+        pass "Retrieved: '$path'";
 
-    open my $fh, '>', $path;
-    print $fh $output;
-    close $fh;
+        ok -e $path, "Existing: '$path'";
+        ok -s $path, "Non-empty: '$path'";
 
-    pass "Inventory written: '$path'";
-
-    last
-};
+        unlink $path;
+    }
+    else
+    {
+        fail "Retrieved: '$vault', $@"
+    }
+}
 
 done_testing;
 

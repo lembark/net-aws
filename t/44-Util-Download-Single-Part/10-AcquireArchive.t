@@ -39,11 +39,12 @@ SKIP:
         or skip "Empty inventory: use 01-AcquireInventory.t ($path)";
     }
 
-    for my $vault_data  ( $::glacier->describe_vault( $vault ) )
+    $::glacier->describe_vault( $vault )
+    or do
     {
         $vault_data
-        or SKIP "Missing vault: '$vault'";
-    }
+        or SKIP "Non-existant vault: '$vault'";
+    };
 
     my $job_id  = $glacier->$inventory_job;
 
