@@ -35,7 +35,7 @@ my $inventory_job
             diag 'Submit inventory job...';
 
             $job_id
-            ||= $glacier->initiate_inventory_retrieval( $vault );
+            ||= $glacier->initiate_inventory_retrieval( $vault, 'JSON' );
 
             sleep 900;
         };
