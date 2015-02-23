@@ -9,7 +9,7 @@ use parent          qw( Net::AWS::Glacier::API  );
 use Carp;
 use File::Spec::Functions;
 use JSON::XS;
-use Object::Trampoline;
+use XML::Simple;
 
 use File::Basename  qw( basename dirname        );
 use List::Util      qw( first                   );
@@ -174,6 +174,35 @@ $DB::single = 1;
     };
 }
 
+sub decode_inventory
+{
+    my $glacier = shift;
+
+    my ( $path, $content ) = $glacier->read_inventory( @_ );
+
+    0 < index $path, '.json.gz'
+    ? decode_json $content
+    : xml_in      $content
+}
+
+sub read_inventory
+{
+    my $glacier = shift;
+    my $vault   = shift or croak 'false vault name';
+    my $path    = shift
+    or do
+    {
+        my $glob    = "./inventory_$vault*gz" )[0];
+
+        my @found   = glob $glob
+        or croak "No available inventory ($glob)";
+
+        $found->[0]
+    };
+
+    ( $path => qx{ gzip -d $path } )
+}
+
 sub retrieve_inventory
 {
     my $glacier = shift;
@@ -303,7 +332,7 @@ $DB::single = 1;
     }
     or die "Lacks inventory: '$vault'\n";
 
-    my $format
+    my ( $expect, $format )
     = do
     {
         # this croaks on a bogus job_id.
@@ -313,10 +342,10 @@ $DB::single = 1;
         $statz->{ Completed }
         or die "Incomplete: '$job_id'\n";
 
-        say "Inventory size: $statz->{ InventorySizeInBytes }"
-        if $verbose;
-
-        lc $statz->{ InventoryRetrievalParameters }{ Format }
+        (
+            $statz->{ InventorySizeInBytes },
+            lc $statz->{ InventoryRetrievalParameters }{ Format }
+        )
     };
 
     # at this point there seems to be something retirevable.
@@ -331,15 +360,17 @@ $DB::single = 1;
     say "Writing inventory: '$path'"
     if $verbose;
 
+    my $content = $glacier->get_job_output( $vault, $job_id );
+
     eval
     {
+        my $found   = length $content;
 
-        my $content = $glacier->get_job_output( $vault, $job_id );
+        $found != $expect
+        and die "Mis-sized content: $found ($expect)\n";
 
         open my $fh, '|-', "gzip -9 > $path";
-
         print $fh $content;
-
         close $fh
     }
     or do
