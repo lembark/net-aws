@@ -14,6 +14,7 @@ my $vault   = "test-glacier-archives";
 my $tmpdir  = './tmp';
 my $base    = 'inventory.json';
 my $path    = "$tmpdir/$base";
+my $format  = 'JSON';
 
 SKIP:
 {
@@ -29,7 +30,7 @@ SKIP:
     my $path    
     = eval
     {
-        $glacier->retrieve_inventory( $vault );
+        $glacier->retrieve_inventory( $vault, $format );
     };
 
     if( $path )
@@ -38,6 +39,19 @@ SKIP:
 
         ok -e $path, "Existing: '$path'";
         ok -s $path, "Non-empty: '$path'";
+
+        my $struct  
+        = eval
+        {
+            my $content = qx{ gzip -dc $path };
+
+            decode_json $content;
+
+            pass "Decoded $format content";
+
+            1
+        }
+        or fail "Failed extracting content ($path)";
 
         unlink $path;
     }

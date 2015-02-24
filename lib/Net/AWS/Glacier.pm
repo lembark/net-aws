@@ -8,11 +8,12 @@ use parent          qw( Net::AWS::Glacier::API  );
 
 use Carp;
 use File::Spec::Functions;
-use JSON::XS;
-use XML::Simple;
+
+use JSON::XS        qw( decode_json             );
+use XML::Simple     qw( xml_in                  );
 
 use File::Basename  qw( basename dirname        );
-use List::Util      qw( first                   );
+use List::Util      qw( reduce                  );
 use Scalar::Util    qw( blessed                 );
 use Symbol          qw( qualify_to_ref          );
 
@@ -52,6 +53,7 @@ sub verbose
 
 ########################################################################
 # job and download management
+########################################################################
 
 for
 (
@@ -118,8 +120,6 @@ sub write_archive
 {
     local @CARP_NOT = ( __PACKAGE__ );
 
-$DB::single = 1;
-
     my $glacier = shift;
     my $vault   = shift or croak 'false vault name';
     my $job_id  = shift or croak 'false job_id';
@@ -174,6 +174,9 @@ $DB::single = 1;
     };
 }
 
+########################################################################
+# inventory
+
 sub decode_inventory
 {
     my $glacier = shift;
@@ -192,12 +195,12 @@ sub read_inventory
     my $path    = shift
     or do
     {
-        my $glob    = "./inventory_$vault*gz" )[0];
+        my $glob    = "./inventory_$vault*gz";
 
         my @found   = glob $glob
         or croak "No available inventory ($glob)";
 
-        $found->[0]
+        $found[0]
     };
 
     ( $path => qx{ gzip -d $path } )
@@ -205,22 +208,26 @@ sub read_inventory
 
 sub retrieve_inventory
 {
+    state $format_d = 'JSON';
+
     my $glacier = shift;
     my $vault   = shift or croak 'false vault name';
-    my $format  = shift || 'JSON';
+    my $format  = shift;
 
     # write_inventory destination is left on the stack.
 
-    my $vault_data  = $glacier->describe_vault( $vault );
+    my $vault_data
+    = local $glacier->{ vault_data }
+    = eval { $glacier->describe_vault( $vault ) }
+    or croak "retrieve_inventory: $@";
 
     $vault_data->{ LastInventoryDate }
     or die "Lacks Inventory: '$vault'.\n";
     
-    # at this point the vault appears to have an inventory.
+    # at this point the vault appears to have an inventory worth
+    # downloading.
 
-    local $glacier->{ vault_data }  = $vault_data;
-
-    $glacier->list_inventory_jobs( $vault, $format )
+    $glacier->list_inventory_jobs( $vault )
     or do
     {
         say "Initiate inventory retrieval ($vault)"
@@ -230,7 +237,7 @@ sub retrieve_inventory
         = $glacier->initiate_inventory_retrieval
         (
             $vault,
-            $format
+            $format || $format_d
         );
 
         say "Waiting for inventory: $job_id"
@@ -243,21 +250,51 @@ sub retrieve_inventory
 
     for(;;)
     {
-        $jobz = $glacier->list_completed_inventory_jobs
-        (
-            $vault,
-            $format
-        )
-        and last;
-        
-        say 'Waiting for inventory job completion'
-        if $verbose;
+        $jobz = $glacier->list_completed_inventory_jobs ( $vault )
+        or do
+        {
+            say 'Waiting for inventory job completion'
+            if $verbose;
 
-        sleep 900;
-        next;
+            sleep 900;
+            next;
+        };
+
+        if( $format )
+        {
+            @$jobz
+            = grep
+            {
+                $format
+                eq $_->{ InventoryRetrievalParameters }{ Format }
+            }
+            @$jobz
+            or do
+            {
+                say "Waiting for '$format' job completion"
+                if $verbose;
+
+                sleep 900;
+                next;
+            };
+        }
+
+        # found the jobs
+
+        last
     }
 
-    my $job_id = $jobz->[0]{ JobId };
+    my $job_id
+    = do
+    {
+        reduce 
+        {
+            $a->{ CompletionDate }
+            gt
+            $b->{ CompletionDate }
+        }
+        @$jobz
+    }->{ JobId };
 
     $glacier->write_inventory( $vault, $job_id, @_ )
 }
@@ -266,7 +303,6 @@ sub list_completed_inventory_jobs
 {
     my $glacier = shift;
     my $vault   = shift or croak 'false vault name';
-    my $format  = shift || 'JSON';
 
     my @jobz
     = sort
@@ -279,7 +315,7 @@ sub list_completed_inventory_jobs
     {
         $_->{ Completed }
     }
-    $glacier->list_inventory_jobs( $vault, $format )
+    $glacier->list_inventory_jobs( $vault )
     or
     return;
 
@@ -292,14 +328,11 @@ sub list_inventory_jobs
 {
     my $glacier = shift;
     my $vault   = shift or croak 'false vault name';
-    my $format  = shift || 'JSON';
 
     my @jobz
     = grep
     {
         'InventoryRetrieval' eq $_->{ Action }
-        and
-        $format eq $_->{ InventoryRetrievalParameters }{ Format }
     }
     $glacier->list_jobs( $vault );
 
@@ -311,8 +344,6 @@ sub list_inventory_jobs
 sub write_inventory
 {
     local @CARP_NOT = ( __PACKAGE__ );
-
-$DB::single = 1;
 
     my $glacier = shift;
     my $vault   = shift or croak 'false vault name';
