@@ -29,6 +29,8 @@ our @CARP_NOT   = ();
 
 my $verbose = '';
 
+my $default_format  = 'JSON';
+
 ########################################################################
 # utility subs
 ########################################################################
@@ -220,25 +222,18 @@ sub read_inventory
     ( $path => qx{ gzip -d $path } )
 }
 
-sub retrieve_inventory
+########################################################################
+# acquire an inventory
+
+sub request_inventory
 {
-$DB::single = 1;
-
-    state $format_d = 'JSON';
-
     my $glacier = shift;
-    my $vault   = shift or croak 'false vault name';
-    my $format  = shift;
+    my $vault   = shift 
+    or croak 'Bogus request_inventory: false vault name.';
+    my $format  = shift || $default_format;
 
-    # write_inventory destination is left on the stack.
-
-    my $vault_data
-    = local $glacier->{ vault_data }
-    = eval { $glacier->describe_vault( $vault ) }
-    or croak "retrieve_inventory: $@";
-
-    $vault_data->{ LastInventoryDate }
-    or die "Lacks Inventory: '$vault'.\n";
+    $glacier->describe_vault( $vault )->{ LastInventoryDate }
+    or die "Vault lacks Inventory: '$vault'.\n";
     
     # at this point the vault appears to have an inventory worth
     # downloading.
@@ -246,6 +241,8 @@ $DB::single = 1;
     my @jobz = $glacier->list_inventory_jobs( $vault )
     or do
     {
+        # make sure that there is something out there to wait for.
+
         say "Initiate inventory retrieval ($vault)"
         if $verbose;
 
@@ -253,7 +250,7 @@ $DB::single = 1;
         = $glacier->initiate_inventory_retrieval
         (
             $vault,
-            $format || $format_d
+            $format || $default_format
         );
 
         say "Submitting inventory job: '$format' ($job_id)"
@@ -262,10 +259,26 @@ $DB::single = 1;
         sleep 60;
     };
 
-    my $t0      = time
-    if $verbose;
+    # at this point there is at least one inventory job pending.
+
+    return
+}
+
+sub available_inventory
+{
+    my $glacier = shift;
+    my $vault   = shift
+    or croak "Bogus available_inventory: false vault name";
+    my $format  = shift;
+
+    # format may be false if we don't care what comes back.
+    # assumption is that the original request was suitable
+    # for retrieval.
 
     my @jobz    = ();
+
+    my $t0      = time
+    if $verbose;
 
     for(;;)
     {
@@ -277,7 +290,8 @@ $DB::single = 1;
             if( $verbose )
             {
                 my $t1  = time - $t0;
-                say "Waiting +${snooze}s for inventory job completion ($t1)";
+                say "Waiting +${snooze}s for inventory job ($t1)"
+                if $verbose;
             }
 
             sleep $snooze;
@@ -290,7 +304,8 @@ $DB::single = 1;
             = grep
             {
                 $format
-                eq $_->{ InventoryRetrievalParameters }{ Format }
+                eq
+                $_->{ InventoryRetrievalParameters }{ Format }
             }
             @jobz
             or do
@@ -298,7 +313,7 @@ $DB::single = 1;
                 say "Waiting for '$format' job completion"
                 if $verbose;
 
-                sleep 900;
+                sleep $snooze;
                 next;
             };
         }
@@ -308,20 +323,31 @@ $DB::single = 1;
         last
     }
 
-    my $job_id
-    = do
-    {
-        reduce 
-        {
-            $a->{ CompletionDate }
-            gt
-            $b->{ CompletionDate }
-        }
-        @jobz
-    }->{ JobId };
+    # caller gets back the most recent complete inventory
+    # job of the appropriate (or any) format.
+
+    $jobz[0]
+}
+
+sub retrieve_inventory
+{
+    my $glacier = shift;
+    my $vault   = shift or croak 'false vault name';
+    my $format  = shift;
+
+    # format may be false to get any inventory available.
+    # write_inventory destination is left on the stack.
+
+    $glacier->submit_inventory  ( $vault, $format );
+
+    my $job     = $glacier->available_inventory( $vault, $format );
+    my $job_id  = $job->{ JobId };
 
     $glacier->write_inventory( $vault, $job_id, @_ )
 }
+
+########################################################################
+# inventory job lists
 
 sub list_completed_inventory_jobs
 {
@@ -365,6 +391,9 @@ sub list_inventory_jobs
     : \@jobz
 }
 
+########################################################################
+# write the inventory contents
+
 sub write_inventory
 {
     local @CARP_NOT = ( __PACKAGE__ );
@@ -374,18 +403,16 @@ sub write_inventory
     my $job_id  = shift or croak 'false job_id';
     my $dest    = shift || './';
 
-    my $date
-    = do
-    {
-        # this croaks on a bogus vault.
+    # sanity check: this has not already been downloaded.
 
-        my $statz
-        = $glacier->{ vault_data }
-        || $glacier->describe_vault( $vault );
+    my $base    = join '_' => 'inventory', $vault, "$date.$format.gz";
+    my $path    = catfile $dest, $base;
 
-        $statz->{ LastInventoryDate }
-    }
-    or die "Lacks inventory: '$vault'\n";
+    -s $path
+    and die "Existing: '$path'\n";
+
+    say "Writing inventory: '$path'"
+    if $verbose;
 
     my ( $expect, $format )
     = do
@@ -402,18 +429,6 @@ sub write_inventory
             lc $statz->{ InventoryRetrievalParameters }{ Format }
         )
     };
-
-    # at this point there seems to be something retirevable.
-    # check that it hasn't already been downloaded.
-
-    my $base    = join '_' => 'inventory', $vault, "$date.$format.gz";
-    my $path    = catfile $dest, $base;
-
-    -s $path
-    and die "Existing: '$path'\n";
-
-    say "Writing inventory: '$path'"
-    if $verbose;
 
     my $content = $glacier->get_job_output( $vault, $job_id );
 
@@ -437,6 +452,9 @@ sub write_inventory
 
     $path
 }
+
+########################################################################
+# acquire job contents: inventory or archive.
 
 sub download_completed_job
 {
