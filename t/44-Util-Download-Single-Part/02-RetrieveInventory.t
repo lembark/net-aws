@@ -21,6 +21,8 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
+    $glacier->verbose( 1 );
+
     for( $tmpdir )
     {
         -e || mkdir $_, 0777

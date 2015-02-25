@@ -7,6 +7,7 @@ use autodie;
 use parent          qw( Net::AWS::Glacier::API  );
 
 use Carp;
+use Data::Dumper;
 use File::Spec::Functions;
 
 use JSON::XS        qw( decode_json             );
@@ -31,6 +32,19 @@ my $verbose = '';
 ########################################################################
 # utility subs
 ########################################################################
+
+sub serialize
+{
+    local $Data::Dumper::Terse      = 1;
+    local $Data::Dumper::Indent     = 1;
+    local $Data::Dumper::Sortkeys   = 1;
+
+    local $Data::Dumper::Purity     = 0;
+    local $Data::Dumper::Deepcopy   = 0;
+    local $Data::Dumper::Quotekeys  = 0;
+
+    join "\n", map { ref $_ ? Dumper $_ : $_ } @_
+}
 
 ########################################################################
 # methods
@@ -208,6 +222,8 @@ sub read_inventory
 
 sub retrieve_inventory
 {
+$DB::single = 1;
+
     state $format_d = 'JSON';
 
     my $glacier = shift;
@@ -227,7 +243,7 @@ sub retrieve_inventory
     # at this point the vault appears to have an inventory worth
     # downloading.
 
-    $glacier->list_inventory_jobs( $vault )
+    my @jobz = $glacier->list_inventory_jobs( $vault )
     or do
     {
         say "Initiate inventory retrieval ($vault)"
@@ -240,35 +256,43 @@ sub retrieve_inventory
             $format || $format_d
         );
 
-        say "Waiting for inventory: $job_id"
+        say "Submitting inventory job: '$format' ($job_id)"
         if $verbose;
 
         sleep 60;
     };
 
-    my $jobz    = ();
+    my $t0      = time
+    if $verbose;
+
+    my @jobz    = ();
 
     for(;;)
     {
-        $jobz = $glacier->list_completed_inventory_jobs ( $vault )
+        state $snooze   = 900;
+
+        @jobz = $glacier->list_completed_inventory_jobs ( $vault )
         or do
         {
-            say 'Waiting for inventory job completion'
-            if $verbose;
+            if( $verbose )
+            {
+                my $t1  = time - $t0;
+                say "Waiting +${snooze}s for inventory job completion ($t1)";
+            }
 
-            sleep 900;
+            sleep $snooze;
             next;
         };
 
         if( $format )
         {
-            @$jobz
+            @jobz
             = grep
             {
                 $format
                 eq $_->{ InventoryRetrievalParameters }{ Format }
             }
-            @$jobz
+            @jobz
             or do
             {
                 say "Waiting for '$format' job completion"
@@ -293,7 +317,7 @@ sub retrieve_inventory
             gt
             $b->{ CompletionDate }
         }
-        @$jobz
+        @jobz
     }->{ JobId };
 
     $glacier->write_inventory( $vault, $job_id, @_ )
