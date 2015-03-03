@@ -16,13 +16,13 @@ SKIP:
 
     my $vault   = "test-glacier-archives";
 
-    $::glacier->describe_vault( $vault ) 
+    $glacier->describe_vault( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
     my @pendz   
     = eval
     {
-        $::glacier->list_jobs( $vault )
+        $glacier->list_jobs( $vault )
     };
 
     $@

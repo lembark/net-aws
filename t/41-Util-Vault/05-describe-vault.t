@@ -9,10 +9,10 @@ use Scalar::Util    qw( reftype );
 use Test::More;
 use Test::GlacierAPI;
 
-for( $::glacier->list_vaults ) 
+for( $glacier->list_vaults ) 
 {
     my $name    = $_->{ VaultName };
-    my $found   = eval { $::glacier->describe_vault( $name ) };
+    my $found   = eval { $glacier->describe_vault( $name ) };
 
     note 'Describe vault returns:', explain $found;
 

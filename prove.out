@@ -1,0 +1,101 @@
+./t/00-Net-AWS-Glacier-API.t ............................. ok
+./t/00-Net-AWS-Glacier.t ................................. ok
+./t/00-Net-AWS-Signature-V4.t ............................ ok
+./t/00-Net-AWS-TreeHash.t ................................ ok
+./t/10-TreeHash/01-SinglePart.t .......................... ok
+./t/10-TreeHash/02-MultiPart.t ........................... ok
+./t/10-TreeHash/03-ProgressiveBufferSize.t ............... ok
+# Install: API object -> main
+./t/30-TestAPI/01-GlacierAPI.t ........................... ok
+./t/30-TestAPI/02-GlacierUtil.t .......................... ok
+# Install: API object -> main
+./t/31-API-Vault/01-VaultOps.t ........................... ok
+# Install: API object -> main
+./t/31-API-Vault/02-ListVault.t .......................... ok
+# Install: API object -> main
+./t/31-API-Vault/03-CreateVault.t ........................ ok
+# Install: API object -> main
+./t/31-API-Vault/04-RemoveVault.t ........................ ok
+# Install: API object -> main
+./t/31-API-Vault/05-describe-vault.t ..................... ok
+# Install: API object -> main
+./t/31-API-Vault/99-Cleanup.t ............................ ok
+# Install: API object -> main
+./t/32-API-Archive/01-Inventory.t ........................ ok
+# Install: API object -> main
+# Vault inventory: ''
+./t/32-API-Archive/02-UploadArchive.t .................... ok
+# Install: API object -> main
+# Vault inventory on ''
+./t/32-API-Archive/03-Inventory.t ........................ ok
+# Install: API object -> main
+./t/33-API-Job/01-Inventory.t ............................ ok
+# Install: API object -> main
+./t/33-API-Job/02-JobList.t .............................. ok
+# Install: API object -> main
+./t/33-API-Job/03-Download.t ............................. ok
+# Install: API object -> main
+./t/40-TestUtil/01-Use-TestAPI.t ......................... ok
+./t/40-TestUtil/02-Use-TestUtil.t ........................ ok
+./t/41-Util-Vault/01-UtilOps.t ........................... ok
+# Install: API object -> main
+./t/41-Util-Vault/02-ListVault.t ......................... ok
+# Install: API object -> main
+./t/41-Util-Vault/03-CreateVault.t ....................... ok
+# Install: API object -> main
+./t/41-Util-Vault/04-RemoveVault.t ....................... ok
+# Install: API object -> main
+./t/41-Util-Vault/05-describe-vault.t .................... ok
+# Install: API object -> main
+./t/41-Util-Vault/06-Inventory.t ......................... ok
+# Install: API object -> main
+# Vault inventory: ''
+./t/41-Util-Vault/07-UploadArchive.t ..................... ok
+# Install: API object -> main
+# Vault inventory on '2015-02-22T03:16:13.297Z'
+./t/41-Util-Vault/08-Inventory.t ......................... ok
+# Install: API object -> main
+./t/41-Util-Vault/10-JobList.t ........................... ok
+# Install: API object -> main
+./t/41-Util-Vault/20-Download.t .......................... ok
+# Install: API object -> main
+./t/41-Util-Vault/20-DownloadInventory.t ................. ok
+./t/41-Util-Vault/99-Cleanup.t ........................... ok
+Prototype mismatch: sub main::reftype ($) vs none at /opt/perl/5.20/lib/5.20.1/Exporter.pm line 66.
+ at ./t/42-Util-Job/01-FilterJobs.t line 10.
+./t/42-Util-Job/01-FilterJobs.t .......................... ok
+Prototype mismatch: sub main::reftype ($) vs none at /opt/perl/5.20/lib/5.20.1/Exporter.pm line 66.
+ at ./t/42-Util-Job/02-HasJobs.t line 10.
+./t/42-Util-Job/02-HasJobs.t ............................. ok
+# Vault inventory: ''
+./t/43-Util-Upload-Single-Part/01-UploadArchive.t ........ ok
+./t/43-Util-Upload-Single-Part/02-UploadPaths.t .......... ok
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+# Waiting for inventory.
+./t/44-Util-Download-Single-Part/01-AcquireInventory.t ... ok
+Cannot detect source of './t/44-Util-Download-Single-Part/02-RetrieveInvent'! at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Parser/IteratorFactory.pm line 261.
+	TAP::Parser::IteratorFactory::detect_source(TAP::Parser::IteratorFactory=HASH(0x1f0acb0), TAP::Parser::Source=HASH(0x1f0b118)) called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Parser/IteratorFactory.pm line 211
+	TAP::Parser::IteratorFactory::make_iterator(TAP::Parser::IteratorFactory=HASH(0x1f0acb0), TAP::Parser::Source=HASH(0x1f0b118)) called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Parser.pm line 470
+	TAP::Parser::_initialize(TAP::Parser=HASH(0x1f06608), HASH(0x1cb6930)) called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Object.pm line 55
+	TAP::Object::new("TAP::Parser", HASH(0x1cb6930)) called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Object.pm line 130
+	TAP::Object::_construct(TAP::Harness=HASH(0x15c7a08), "TAP::Parser", HASH(0x1cb6930)) called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Harness.pm line 852
+	TAP::Harness::make_parser(TAP::Harness=HASH(0x15c7a08), TAP::Parser::Scheduler::Job=HASH(0x1cb6138)) called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Harness.pm line 651
+	TAP::Harness::_aggregate_single(TAP::Harness=HASH(0x15c7a08), TAP::Parser::Aggregator=HASH(0x1a5f538), TAP::Parser::Scheduler=HASH(0x1c0d6c8)) called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Harness.pm line 743
+	TAP::Harness::aggregate_tests(TAP::Harness=HASH(0x15c7a08), TAP::Parser::Aggregator=HASH(0x1a5f538), "./t/00-Net-AWS-Glacier-API.t", "./t/00-Net-AWS-Glacier.t", "./t/00-Net-AWS-Signature-V4.t", "./t/00-Net-AWS-TreeHash.t", "./t/10-TreeHash/01-SinglePart.t", "./t/10-TreeHash/02-MultiPart.t", "./t/10-TreeHash/03-ProgressiveBufferSize.t", ...) called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Harness.pm line 558
+	TAP::Harness::__ANON__() called at /opt/perl/5.20/lib/site_perl/5.20.1/TAP/Harness.pm line 571
+	TAP::Harness::runtests(TAP::Harness=HASH(0x15c7a08), "./t/00-Net-AWS-Glacier-API.t", "./t/00-Net-AWS-Glacier.t", "./t/00-Net-AWS-Signature-V4.t", "./t/00-Net-AWS-TreeHash.t", "./t/10-TreeHash/01-SinglePart.t", "./t/10-TreeHash/02-MultiPart.t", "./t/10-TreeHash/03-ProgressiveBufferSize.t", "./t/30-TestAPI/01-GlacierAPI.t", ...) called at /opt/perl/5.20/lib/site_perl/5.20.1/App/Prove.pm line 546
+	App::Prove::_runtests(App::Prove=HASH(0x15bacf8), HASH(0x1a03070), "./t/00-Net-AWS-Glacier-API.t", "./t/00-Net-AWS-Glacier.t", "./t/00-Net-AWS-Signature-V4.t", "./t/00-Net-AWS-TreeHash.t", "./t/10-TreeHash/01-SinglePart.t", "./t/10-TreeHash/02-MultiPart.t", "./t/10-TreeHash/03-ProgressiveBufferSize.t", ...) called at /opt/perl/5.20/lib/site_perl/5.20.1/App/Prove.pm line 504
+	App::Prove::run(App::Prove=HASH(0x15bacf8)) called at /opt/bin/prove line 12

@@ -24,9 +24,9 @@ SKIP:
         {
             $_->{ VaultName } eq $name
         }
-        $::glacier->list_vaults
+        $glacier->list_vaults
         or
-        $::glacier->create_vault( $name )
+        $glacier->create_vault( $name )
         or
         BAIL_OUT "Failed create vault: '$name' ($@_)";
 
@@ -34,7 +34,7 @@ SKIP:
     }
     or BAIL_OUT "Error installing test vault: $@";
 
-    if( my $vault_data  = $::glacier->describe_vault( $vault ) )
+    if( my $vault_data  = $glacier->describe_vault( $vault ) )
     {
         my $date = $vault_data->{ LastInventoryDate } 
         or skip 
@@ -51,7 +51,7 @@ SKIP:
         my $job_id
         = eval
         {
-            $::glacier->initiate_inventory_retrieval( $vault, 'JSON' );
+            $glacier->initiate_inventory_retrieval( $vault, 'JSON' );
         };
 
         my $error   = $@;

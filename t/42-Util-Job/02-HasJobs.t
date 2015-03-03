@@ -17,7 +17,7 @@ SKIP:
 
     my $vault   = "test-glacier-archives";
 
-    $::glacier->describe_vault( $vault ) 
+    $glacier->describe_vault( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
     for( qw( pending completed ) )
@@ -25,9 +25,9 @@ SKIP:
         my $list    = join '_' => 'list', $_, 'jobs';
         my $has     = join '_' => 'has',  $_, 'jobs';
 
-        my @a   = $::glacier->$list( $vault );
+        my @a   = $glacier->$list( $vault );
         my $i   = @a > 0;
-        my $j   = $::glacier->$has( $vault );
+        my $j   = $glacier->$has( $vault );
 
         ok $i == $j, "Has $_ jobs matches job list";
     }

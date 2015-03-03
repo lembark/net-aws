@@ -13,8 +13,6 @@ use Test::GlacierUtil;
 my $vault   = "test-glacier-archives";
 my $tmpdir  = './tmp';
 my $base    = 'inventory.json';
-my $path    = "$tmpdir/$base";
-my $format  = 'JSON';
 
 SKIP:
 {
@@ -27,12 +25,18 @@ SKIP:
     {
         -e || mkdir $_, 0777
         or BAIL_OUT "Failed mkdir: '$_', $!";
+
+        chdir $tmpdir
+        or BAIL_OUT "Failed chdir: '$_', $!";
     }
+    
+    # at this point the inventory will be loaded into 
+    # ./$vault.inventory.json.gz.
 
     my $path    
     = eval
     {
-        $glacier->retrieve_inventory( $vault, $format );
+        $glacier->retrieve_inventory( $vault );
     };
 
     if( $path )
@@ -49,7 +53,7 @@ SKIP:
 
             decode_json $content;
 
-            pass "Decoded $format content";
+            pass "Decoded content";
 
             1
         }

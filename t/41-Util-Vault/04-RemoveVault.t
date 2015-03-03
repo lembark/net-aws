@@ -11,7 +11,7 @@ use Test::GlacierAPI;
 my $method  = 'delete_vault';
 my @argz    = qw( test-glacier-module );
 
-my $found   = eval { $::glacier->$method( @argz ) };
+my $found   = eval { $glacier->$method( @argz ) };
 
 ok ! $@,    "No errors ($@)";
 ok $found,  "$method returns";
@@ -39,7 +39,7 @@ for( reftype $found )
     }
 }
 
-my @vaultz  = $::glacier->list_vaults;
+my @vaultz  = $glacier->list_vaults;
 
 note 'Exisiting vaults:', explain @vaultz;
 

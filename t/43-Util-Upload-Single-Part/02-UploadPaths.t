@@ -24,9 +24,9 @@ SKIP:
         {
             $_->{ VaultName } eq $name
         }
-        $::glacier->list_vaults
+        $glacier->list_vaults
         or
-        $::glacier->create_vault( $name )
+        $glacier->create_vault( $name )
         or
         die "Failed create vault: '$name' ($@_)";
 
@@ -34,13 +34,13 @@ SKIP:
     }
     or BAIL_OUT "Error installing test vault: $@";
 
-    if( my $vault_data  = $::glacier->describe_vault( $vault ) )
+    if( my $vault_data  = $glacier->describe_vault( $vault ) )
     {
         my @pathz   = glob 't/0*.t';
         my %path2arch
         = eval
         {
-            $::glacier->upload_paths( $name => @pathz );
+            $glacier->upload_paths( $name => @pathz );
         };
 
         note "Upload results:\n", explain \%path2arch;

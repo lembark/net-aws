@@ -8,15 +8,19 @@ use Test::More;
 
 use_ok 'Test::GlacierUtil';
 
-$::glacier
-or BAIL_OUT "glacier not exported by GlacierUtil";
+eval
+q{
 
-my $expect  = 'Net::AWS::Glacier';
-my $found   = blessed $::glacier;
+    $glacier
+    or BAIL_OUT "glacier not exported by GlacierUtil";
 
-$found eq $expect
-or BAIL_OUT "Mismatched class: '$found' ($expect)";
+    my $expect  = 'Net::AWS::Glacier';
+    my $found   = blessed $glacier;
 
-pass "Glacier is $expect";
+    $found eq $expect
+    or BAIL_OUT "Mismatched class: '$found' ($expect)";
+
+    pass "Glacier is $expect";
+};
 
 done_testing;

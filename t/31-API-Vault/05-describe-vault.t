@@ -9,30 +9,36 @@ use Scalar::Util    qw( reftype );
 use Test::More;
 use Test::GlacierAPI;
 
-for( $::glacier->list_vaults ) 
+SKIP:
 {
-    my $name    = $_->{ VaultName };
-    my $found   = eval { $::glacier->describe_vault( $name ) };
+    $ENV{ AWS_GLACIER_FULL }
+    or skip "AWS_GLACIER_FULL not set", 1;
 
-    note 'Describe vault returns:', explain $found;
-
-    ok ! $@,    "Errors: '$@'";
-
-    SKIP:
+    for( $glacier->list_vaults ) 
     {
-        $found  or skip "Nothing found for $name", 1;
+        my $name    = $_->{ VaultName };
+        my $found   = eval { $glacier->describe_vault( $name ) };
 
-        ok exists $found->{ $_ }, "Describe $name contains: '$_'"
-        for
-        qw
-        (
-            CreationDate
-            LastInventoryDate
-            NumberOfArchives
-            SizeInBytes
-            VaultARN
-            VaultName
-        );
+        note 'Describe vault returns:', explain $found;
+
+        ok ! $@,    "Errors: '$@'";
+
+        SKIP:
+        {
+            $found  or skip "Nothing found for $name", 1;
+
+            ok exists $found->{ $_ }, "Describe $name contains: '$_'"
+            for
+            qw
+            (
+                CreationDate
+                LastInventoryDate
+                NumberOfArchives
+                SizeInBytes
+                VaultARN
+                VaultName
+            );
+        }
     }
 }
 

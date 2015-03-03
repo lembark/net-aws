@@ -10,10 +10,10 @@ my $madness = 'Test::GlacierUtil';
 
 use_ok $madness;
 
-$::glacier
+$glacier
 or BAIL_OUT 'Failed installing $glacier test object';
 
-for my $found ( blessed $::glacier )
+for my $found ( blessed $glacier )
 {
     my $expect  = 'Net::AWS::Glacier';
 

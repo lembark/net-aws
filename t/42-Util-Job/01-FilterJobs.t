@@ -17,13 +17,13 @@ SKIP:
 
     my $vault   = "test-glacier-archives";
 
-    $::glacier->describe_vault( $vault ) 
+    $glacier->describe_vault( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
     my @pass1   
     = eval
     {
-        $::glacier->list_jobs( $vault )
+        $glacier->list_jobs( $vault )
     };
 
     $@
@@ -34,7 +34,7 @@ SKIP:
     do
     {
         my @expect  = grep { ! $_->{ Completed } } @pass1;
-        my @found   = $::glacier->list_pending_jobs( $vault );
+        my @found   = $glacier->list_pending_jobs( $vault );
 
         cmp_deeply \@found, \@expect, 'Pending Jobs';
     };
@@ -42,7 +42,7 @@ SKIP:
     do
     {
         my @expect  = grep {   $_->{ Completed } } @pass1;
-        my @found   = $::glacier->list_completed_jobs( $vault );
+        my @found   = $glacier->list_completed_jobs( $vault );
 
         cmp_deeply \@found, \@expect, 'Completed Jobs';
     };

@@ -24,9 +24,9 @@ SKIP:
         {
             $_->{ VaultName } eq $name
         }
-        $::glacier->list_vaults
+        $glacier->list_vaults
         or
-        $::glacier->create_vault( $name )
+        $glacier->create_vault( $name )
         or
         die "Failed create vault: '$name' ($@_)";
 
@@ -34,7 +34,7 @@ SKIP:
     }
     or BAIL_OUT "Error installing test vault: $@";
 
-    if( my $vault_data  = $::glacier->describe_vault( $vault ) )
+    if( my $vault_data  = $glacier->describe_vault( $vault ) )
     {
         # the stable archive test vault does exist 
 
