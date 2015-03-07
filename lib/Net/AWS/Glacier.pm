@@ -4,359 +4,93 @@
 package Net::AWS::Glacier;
 use v5.20;
 use autodie;
-use parent          qw( Net::AWS::Glacier::API  );
 
-use Carp;
-use Data::Dumper;
-use File::Spec::Functions;
-
-use JSON::XS        qw( decode_json             );
-use XML::Simple     qw( xml_in                  );
-
-use File::Basename  qw( basename dirname        );
-use List::Util      qw( reduce                  );
-use Scalar::Util    qw( blessed                 );
-use Symbol          qw( qualify_to_ref          );
-
-########################################################################
-# package variables
-########################################################################
-
-our $VERSION    = '0.01';
-$VERSION        = eval $VERSION;
-
-our @CARP_NOT   = ();
-
-my $verbose = '';
-
-my $default_format  = 'JSON';
-
-########################################################################
-# utility subs
-########################################################################
-
-########################################################################
-# methods
-#
-# Note: construcion is handled by the API.
-########################################################################
-
-sub verbose
-{
-    shift;  # ignore the invocant
-
-    @_
-    ? ( $verbose = !! shift )
-    : $verbose
-}
-
-########################################################################
-# bundle API calls 
-########################################################################
-
-########################################################################
-# job and download management
-########################################################################
-
-for
-(
-    [ qw( has_pending_jobs      false   ) ],
-    [ qw( has_completed_jobs    true    ) ],
-)
-{
-    my ( $name, $status ) = @$_;
-
-    *{ qualify_to_ref $name }
-    = sub
-    {
-        local @CARP_NOT = ( __PACKAGE__ );
-
-        my ( $glacier, $vault, $limit ) = @_;
-
-        # "onepass" == true
-
-        my ( undef, $jobz ) 
-        = $glacier->iterate_list_jobs( $vault, 0, $status, 1 );
-
-        # i.e., true if there is anything out there
-
-        scalar @$jobz
-    };
-}
-
-for
-(
-    [ qw( list_pending_jobs     false   ) ],
-    [ qw( list_completed_jobs   true    ) ],
-)
-{
-    my ( $name, $status ) = @$_;
-
-    *{ qualify_to_ref $name }
-    = sub
-    {
-        local @CARP_NOT = ( __PACKAGE__ );
-
-        my ( $glacier, $name, $limit ) = @_;
-
-        my @jobz    = ();
-
-        for( ;; )
-        {
-            # "onepass" == false
-
-            my ( $cont, $found ) 
-            = $glacier->iterate_list_jobs( $name, $limit, $status );
-
-            push @jobz, @$found;
-
-            $cont or last;
-        }
-
-        wantarray
-        ?  @jobz
-        : \@jobz
-    };
-}
-
-sub write_archive
-{
-    local @CARP_NOT = ( __PACKAGE__ );
-
-    my $glacier = shift;
-    my $vault   = shift or croak 'false vault name';
-    my $job_id  = shift or croak 'false job_id';
-    my $dest    = shift || './';
-    my $desc    = shift // '';
-
-    # grab the job contents in any case to get the job out
-    # of the queue.
-
-    my $path
-    = do
-    {
-        my $base    = $desc || $job_id;
-
-        -d $dest
-        ? catfile $dest, $base
-        : $dest
-    };
-
-    if( -e $path )
-    {
-        say "Existing path: '$path'";
-        return
-    }
-    else
-    {
-        my $dir = dirname $path;
-
-        -e $dir or croak "non-existant destination dir ($dir)";
-        -w _    or croak "non-writeable '$dir'";
-
-        say "Writing: '$path'";
-    }
-
-    eval
-    {
-
-        my $output  = $glacier->get_job_output( $vault, $job_id );
-
-        open my $fh, '>', $path;
-
-        $fh->binmode( 1 );
-
-        print $fh $output;
-        close $fh
-    }
-    or do
-    {
-        unlink $path;
-
-        croak "Failed writing content: '$path', $@"
-    };
-}
-
-########################################################################
-# inventory
-
-########################################################################
-# acquire job contents: inventory or archive.
-
-sub download_completed_job
-{
-    local @CARP_NOT = ( __PACKAGE__ );
-
-    state $writerz = 
-    {
-        qw
-        (
-            ArchiveRetrieval    write_archive
-            InventoryRetrieval  write_inventory
-        )
-    };
-    state $seen = {};
-
-    my $glacier = shift;
-    my $vault   = shift or croak "false vault name";
-    my $dest    = shift || '.';
-
-    say "Download to: '$dest'";
-
-    my %seen    = ();
-
-    if( $dest )
-    {
-        $dest   .= '/';
-        make_path $dest;
-    }
-
-    my $jobz    = $glacier->list_completed_jobs( $vault );
-
-    for( @$jobz )
-    {
-        my ( $job_id, $type, $desc )
-        = @{ $_ }{ qw( JobId Action JobDescription ) };
-
-        $seen->{ $job_id }
-        and next;
-
-        my $writer = $writerz->{ $type }
-        or do
-        {
-            carp "Unknown job type: '$type' ($desc)";
-
-            next
-        };
-
-        say "Download: '$desc' ($job_id)";
-
-        eval
-        {
-            $seen->{ $job_id }
-            = $glacier->$writer( $vault, $job_id, $dest, $desc )
-        }
-        or 
-        carp "Failed write: '$desc' $@ ($job_id)";
-    }
-
-    # caller can determine if the jobs should be downloaded
-    # again by removing the value or track which paths are
-    # available locally with the values.
-    
-    $seen
-}
-
-sub download_all_jobs
-{
-    local @CARP_NOT = ( __PACKAGE__ );
-
-    my $glacier = shift;
-    my $vault   = shift or croak "false vault";
-    my $dest    = shift;
-
-    my @pathz   = '';
-
-    for( ;; )
-    {
-        if( $glacier->has_completedjobs( $vault ) )
-        {
-            my $seen    
-            = $glacier->download_completed_job( $vault, $dest );
-
-            my @a   = values %$seen;
-
-            push @pathz, @a;
-
-            local $,    = "\n\t";
-            say 'Downloads:', @a;
-        }
-        else
-        {
-            say "No completed jobs to download: $_[0]";
-        }
-
-        if(  $glacier->has_pending_jobs( @_ ) )
-        {
-            say "Wait for pending jobs...";
-
-            my $time    = 3600;
-
-            for( 1 .. 60 )
-            {
-                local $\;
-                print "Remaining: $time ...\r";
-
-                sleep 60;
-
-                $time   -= 60;
-            }
-        }
-        else
-        {
-            say "No pending jobs: download complete";
-
-            last
-        }
-    }
-}
-
-########################################################################
-# archive and upload management
-
-sub upload_paths
-{
-    my $glacier = shift;
-    my $vault   = shift or croak "false vault name";
-
-    @_  or return;
-
-    my %path2arch   = ();
-
-    for( @_ )
-    {
-        my ( $path, $desc )
-        = (ref)
-        ? @$_
-        : $_
-        ;
-
-        $path2arch{ $path } 
-        = eval
-        {
-            $glacier->upload_archive( $vault, $path, $desc )
-        }
-        or carp "'$path', $@"; 
-    }
-
-    wantarray   // return;
-
-    wantarray
-    ?  %path2arch
-    : \%path2arch
-}
+our $VERSION='1.00';
+eval $VERSION;
 
 # keep require happy 
 1
-
 __END__
 
 =head1 NAME
 
-Net::AWS::Glacier::Util - higher-level utilities using 
-AWS::Glacier::API
+Net::AWS::Glacier - Documentation for Net::AWS::Glacier::* modules.
 
 =head1 SYNOPSIS
 
+    # high-level work is done with vaults, lower-level calls
+    # mimic the API.
+
     # package or object, same results.
 
-    my $vebose  = Net::AWS::Glacier::Util->verbose;
-    my $vebose  = Net::AWS::Glacier::Util->verbose( 1 );
-    my $vebose  = Net::AWS::Glacier::Util->verbose( '' );
+    my $vebose  = Net::AWS::Glacier::Vault->verbose;
+    my $vebose  = Net::AWS::Glacier::Vault->verbose( 1 );
+    my $vebose  = Net::AWS::Glacier::Vault->verbose( '' );
 
-    # these all croak on errors.
+    my $vebose  = Net::AWS::Glacier::API->verbose;
+    my $vebose  = Net::AWS::Glacier::API->verbose( 1 );
+    my $vebose  = Net::AWS::Glacier::API->verbose( '' );
 
-    # util object dispatches API calls into Net::AWS::Glacier::API.
+    # everything from here down croaks on errors with the 
+    # CARP_NOT usuallly set to the NET::AWS::Glacier call
+    # stack so that the origin of an error is discernable.
+
+    # Vault objects have a pre-assigned vault name and will 
+    # inherit their region, secret, and key from a parent
+    # vault object at initializtion time.
+
+    # if you only deal with one vault, by all means: construct
+    # it fully populated.
+
+    my $vault = Net::AWS::Glacier::Vault->new
+    (
+        'prod_backup', 
+        'us-west-99',
+        'very, very secret',
+        'key to hexidecimal happyness'
+    );
+    
+    # if you want to iterate multiple vaults in a region it will
+    # probably be easier to create a prototype.
+
+    my $proto = Net::AWS::Glacier::Vault->new
+    (
+        '', 
+        'us-east',
+        'very, very secret',
+        'key to hexidecimal happyness'
+    );
+
+    for my $name ( qw( prod_backup test_data ) )
+    {
+        $proto->new( $name )->initate_inventory_retrieval;
+    }
+
+    # or do your daily downloads.
+
+
+    for my $name ( @vault_names )
+    {
+        my $vault   = $proto->new( $name );
+
+        if( $vault->has_complete_jobs )
+        {
+            # this will loop until there are no pending jobs left
+            # to download. 
+
+            $vault->download_all_jobs
+            (
+                dest    => "/download/glacier/$name",
+                fork    => 1
+            );
+        }
+    }
+
+####
+#### in work
+####
+
+    my $prod_data   = $factory->new( 'production' );
 
     my $glacier = Net::AWS::Glacier::Util->new
     (

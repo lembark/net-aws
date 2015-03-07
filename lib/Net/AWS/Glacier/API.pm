@@ -20,6 +20,8 @@ use Symbol          qw( qualify_to_ref                      );
 use Net::AWS::Signature::V4;
 use Net::AWS::TreeHash      qw( tree_hash tree_hash_hex );
 
+use Exporter::Proxy qw( dispatch=glacier_api );
+
 ########################################################################
 # package variables
 ########################################################################
@@ -347,10 +349,13 @@ sub construct
 
 sub initialize
 {
-    state $ua   = LWP::UserAgent->new
-    (
-        agent=> __PACKAGE__ . '/' . $VERSION
-    );
+    state $ua
+    = do
+    {
+        my $agent   = join '/' => __PACKAGE__, $VERSION;
+
+        LWP::UserAgent->new( agent   => $agent )
+    };
 
     my $api     = shift;
     my $region  = shift or croak "false 'region'";
@@ -361,9 +366,6 @@ sub initialize
     (
         $key, $secret, $region, 'glacier'
     );
-
-    say "# Initialize: '$region' api"
-    if $verbose;
 
     %$api =
     (
