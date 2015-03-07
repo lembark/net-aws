@@ -889,8 +889,13 @@ sub get_job_output
 
 sub list_jobs
 {
+    ...;
+
+    state $empty    = {};
+
     my $api     = shift;
     my $name    = shift or croak "false vault name";
+    my $paramz  = shift || $empty;
 
     $api->$loop_request
     (

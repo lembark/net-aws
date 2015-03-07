@@ -165,72 +165,109 @@ sub call_api
 # job and download management
 ########################################################################
 
+########################################################################
+# standard collection of job queries
+
 for
 (
-    [ qw( has_pending_jobs      false   ) ],
-    [ qw( has_completed_jobs    true    ) ],
+    [ has   => 1 ],
+    [ list  => 0 ],
 )
 {
-    my ( $name, $status ) = @$_;
+    my ( $output, $onepass ) = @$_;
 
-    *{ qualify_to_ref $name }
-    = sub
+    for
+    (
+        [ qw( pending  false   ) ],
+        [ qw( completed true    ) ],
+    )
     {
-        local @CARP_NOT = ( __PACKAGE__ );
+        my ( $status, $completed ) = @_;
 
-        my ( $vault, $limit ) = @_;
-
-        # "onepass" == true
-
-        my ( undef, $jobz ) 
-        = $vault->call_api
+        for
         (
-            iterate_list_jobs => 0, $status, 1
-        );
+            [ qw( inventory Inventory   ) ],
+            [ qw( download  Download    ) ],
+        )
+        {
+            my ( $type, $action ) = @$_;
 
-        # i.e., true if there is anything out there
+            my $name    = join '_' => $output, $status, $type, 'jobs';
 
-        scalar @$jobz
-    };
+            *{ qualify_to_ref $name }
+            = sub
+            {
+                local @CARP_NOT = ( __PACKAGE__ );
+
+                my $vault   = shift;
+                my $limit   = $onepass ? 1 : shift;
+
+                # note: limit validation is dealt with in the api call.
+
+                for( ;; )
+                {
+                    my ( $cont, $found ) 
+                    = $vault->call_api
+                    (
+                        iterate_list_jobs => $limit, $status
+                    );
+
+                    # onepass: caller gets back true if N > 0 jobs.
+
+                    return !! @$found
+                    if $onepass;
+
+                    # otherwise accumulate the jobs until there is
+                    # nothing left.
+
+                    push @jobz, @$found;
+                    $cont       or last;
+                }
+
+                # not a one-pass lookup: hand back the list.
+
+                wantarray
+                ?  @jobz
+                : \@jobz
+            };
+        }
+    }
 }
 
-for
-(
-    [ qw( list_pending_jobs     false   ) ],
-    [ qw( list_completed_jobs   true    ) ],
-)
+sub has_current_inventory
 {
-    my ( $name, $status ) = @$_;
-
-    *{ qualify_to_ref $name }
+    state $filter_complete
     = sub
     {
-        local @CARP_NOT = ( __PACKAGE__ );
+        my ( $vault, $cutoff ) = @_;
 
-        my ( $vault, $limit ) = @_;
-
-        my @jobz    = ();
-
-        for( ;; )
+        first
         {
-            # "onepass" == false
-
-            my ( $cont, $found ) 
-            = $vault->call_api
-            (
-                iterate_list_jobs => $limit, $status
-            );
-
-            push @jobz, @$found;
-
-            $cont or last;
+            $_->{ Action            } eq 'Inventory'
+            and
+            $_->{ CompletionDate    } gt $cutoff
         }
-
-        wantarray
-        ?  @jobz
-        : \@jobz
+        $vault->list_completed_jobs
     };
+    state $desc     = 'describe_vault';
+    state $inv_key  = 'LastInventoryDate'; 
+
+    my $vault       = shift;
+    my $inv_date    = $vault->call_api( $desc )->{ $inv_key };
+
+    # this will eventually exit since a job is submitted if necessary
+    # and they will eventually complete.
+
+    for(;;)
+    {
+        $vault->$filter_complete( $inv_date )
+        and last;
+    }
+
 }
+
+########################################################################
+# output contents of jobs once they are completed
 
 sub write_archive
 {
@@ -418,6 +455,58 @@ sub download_all_jobs
             last
         }
     }
+}
+
+sub download_current_inventory
+{
+    state $filter_complete
+    = sub
+    {
+        my ( $vault, $cutoff ) = @_;
+
+        first
+        {
+            $_->{ Action            } eq 'Inventory'
+            and
+            $_->{ CompletionDate    } gt $cutoff
+        }
+        $vault->list_completed_jobs
+    };
+    state $desc     = 'describe_vault';
+    state $inv_key  = 'LastInventoryDate'; 
+
+    my $vault       = shift;
+    my $inv_date    = $vault->call_api( $desc )->{ $inv_key };
+
+    # this will eventually exit since a job is submitted if necessary
+    # and they will eventually complete.
+
+    for(;;)
+    {
+        $vault->$filter_complete( $inv_date )
+        and last;
+    }
+
+    # if there isn't an completed inventory job later than the last
+    # inventory or a pending one then submit a new job.
+
+    $vault->$filter_jobs( $inv_date )
+
+    # now download any completed inventory jobs until at least one
+    # of them is afte the last vault inventory.
+    # 
+
+    for(;;)
+    {
+        $found
+        = first
+    }
+
+
+    for my $job $vault->list_completed_jobs
+
+
+    # return a path to the latest inventory available.
 }
 
 ########################################################################
