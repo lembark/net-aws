@@ -20,12 +20,11 @@ sub glacier
 
     my $class   = qualify $type;
 
-    my $const   = $class->can( 'new' )
+    my $handler = $class->can( 'new' )
     or croak "Botched new: '$type' lacks 'new' ($class)";
 
-    $proto->$const( @_ )
+    $proto->$handler( @_ )
 }
-
 
 # keep require happy 
 1
@@ -127,25 +126,21 @@ Net::AWS::Glacier - Documentation for Net::AWS::Glacier::* modules.
 
 =head1 DESCRIPTION
 
-This is the documentation for the higher-level Net::AWS::Glacier::Vault
-and lower-level Net::AWS::Glacier::API modules. The "Vault" class
-supports operations on single vaults (e.g., "acquire the most recent
-inventory", "download the contents of all completed jobs"); the API
-class mimics AWS' low-level where that is useful.
+This is user documentation for Net::AWS::Glacier::Vault
+and Net::AWS::Glacier::API. The "Vault" class supports operations on
+single vaults (e.g., "acquire the most recent inventory", "download
+the contents of all completed jobs"); the API class mimics AWS'
+low-level where that is useful.
 
 Incuded here are basic usage examples of the Vault class and a 
 description of the data structures returned from both Vault and API
 methods. Details of using each class, including its methods and 
 sanity checks, are in the respective modules.
 
-This module provides a single constructor of the form:
+This module provides a single constructor with an added type argument:
 
     my $vault   = Net::AWS::Glacier->new( Vault => ... );
     my $api     = Net::AWS::Glacier->new( API   => ... );
-
-which can simplify life for derived classes.
-
-
 
 =head2 AWS Request / Response Structures
 
@@ -159,7 +154,12 @@ These are all taken from
 
 =item Describe Vault
 
-This uses only the standard request headers, returning a strucure of:
+Calling:
+
+    $vault->describe;
+    $api->describe_vault( $vault_name );
+
+Returns a structure like:
 
     {
       "CreationDate" : String,
@@ -248,188 +248,6 @@ Documentation:
 <http://docs.aws.amazon.com/amazonglacier/latest/dev/using-iam-with-amazon-glacier.html>
 
 =back
-
-########################################################################
-# notes: these need to get removed, eventually.
-########################################################################
-
-    my $path2arch = $glacier->upload_paths
-    (
-        $path,              # use path for description
-        [ $path, $desc ],   # explicit description
-        ...
-    );
-
-    my $path2arch = $glacier->upload_paths
-    (
-        {
-            path => '',     # use path for description
-            path => desc,   # use explicit description
-            ...
-        }
-    );
-
-    # download and record any completed jobs,
-    # loop w/ 1-hour wait while any pending jobs.
-
-    my @local   = $glacier->download_all_jobs
-    (
-        $vault_name,    # required
-        $dest_dir       # optional, defaults to '.'
-    );
-
-    # iterate write_archive for all completed jobs.
-    # returns local paths.
-
-    my @local   = $glacier->download_completed_job
-    (
-        $vault_name,    # required
-        $dest_dir       # optional, defaults to '.'
-    );
-
-    # write the completed archive job's output to a local path.
-    # basename defaults to archive_id, dir defaults to '.'.
-    # returns false if content not written.
-
-    my $path    = $glacier->write_archive
-    (
-        $vault_name,
-        $completed_job_id,
-        $path
-    );
-
-    # write completed inventory job to a local path.
-    # basename is one of
-    #   "$vault_id-$inventory_date.json.gz"
-    #   "$vault_id-$inventory_date.xml.gz"
-    #
-
-    my $path    = $glacier->write_inventory
-    (
-        $vault_name,
-        $completed_job_id,
-        $directory
-    );
-
-    # return counts of completed or pending incomplete jobs.
-
-    $glacier->has_completedjobs( $vault_name );
-    $glacier->has_pending_jobs( $vault_name );
-
-    # return array[ref] of completed or pending incomplete jobs.
-
-    $glacier->list_completed_jobs( $vault_name );
-    $glacier->list_pending_jobs( $vault_name );
-
-=head1 DESCRIPTION
-
-None of these are necessary for accessing the AWS::Glacier API.
-
-These provide some higher-level looping utilities for moving data in
-and out of AWS' Glacier service.
-
-Either of the modules can be used alone, the only utility in this
-module is pulling them both in at once and providing the documentation.
-
-=head2 Arguments
-
-User key & secret, vault name, description are passed to Glacier::API.
-
-The key & secret are provided by Amazon, Vault name is UTF8, 
-description is printable ASCII with a length < 1025 chars. 
-
-See Glacier::API for detailed information.
-
-=head2 Constructor & Class Methods
-
-=over 4
-
-=item new
-
-Inherited from Net::AWS::Glacier::API. This takes a facility,
-user key, and user secret, returning the object.
-
-=item verbose
-
-    # new value is stored via "!! $value" to avoid lifecycle
-    # issues with objects.
-
-    my $curr_value  = $prototype->verbose;
-    my $curr_value  = $prototype->verbose( $new_value );
-
-=back
-
-=head2 Pending & Completed Jobs
-
-These return the list if complete/incomplete jobs for a vault
-or a boolean (i.e., scalar @jobs_found).
-
-These all take a vault name and maximum number of jobs to download.
-The maximum job limit is 1000.
-
-    # the first call returns an unlimited list,
-    # the second call returns at most 10 jobs.
-
-    $glacier->list_completed_jobs( $vault_name      );
-    $glacier->list_completed_jobs( $vault_name, 10  );
-
-=over 4
-
-=item list_completed_jobs list_pending_jobs
-
-Returns an array[ref] of Job structs.
-See Net::AWS::Glacier::API under "list_jobs" for details of the
-job structure.
-
-=item has_completedjobs has_pending_jobs
-
-These call list_*_jobs with a limit of 1, returning true or false if
-any jobs are found.
-
-=back
-
-=head2 Download
-
-Both write_inventory & write_archive avoid overwriting exising files.
-download_completed_job tracks job_id values and will avoid acquiring 
-content multiple times within the same session (e.g., if called
-repeatedly from download_all_jobs).
-
-These all take a vault name simplify calling them
-from external subroutines.
-
-=item write_inventory( $vault_name, $job_id, $local_directory );
-
-Download & write gzip-ed output (these can get large) with a 
-basename of the vault name & inventory generation timesetamp.
-The optional local directory defaults to the current working
-directory via './'.
-
-=item write_archive( $vault_name, $job_id, $local_path );
-
-Download and write the archive output as-is, the local path defaults
-to the archive_id.
-
-=item download_completed_job( $vault_name, $local_directory );
-
-Iterates completed jobs through write_archive or write_inventory,
-returning the list of downloaded paths.
-
-=item download_all_jobs( $vault_name, $local_directory );
-
-This has an outer loop that iterates while there are any 
-incomplete jobs pending for the vault, downloading any completed
-jobs each time. Each iteration includes a 1-hour sleep.
-This returns the accumulated paths from all calls to download_completed.
-
-I<Note that this call can easily take hours to complete given
-the 5-hour nominal turnaround for retrieving archive content.>
-
-=head2 Upload
-
-
-TODO
-
 
 =head1 SEE ALSO
 
