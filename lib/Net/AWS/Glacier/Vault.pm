@@ -47,6 +47,109 @@ my @arg_fieldz      = qw( api region key secret );
 # methods
 ########################################################################
 
+########################################################################
+# manufacture api interfaces.
+
+for
+(
+    [ has   => 1 ],
+    [ list  => 0 ],
+)
+{
+    # The names look like:
+    #
+    # {has|list}_{pending|completed}_{download|inventory}_jobs.
+    #
+    # e.g., 
+    #
+    #   "has_completed_inventory_jobs"
+    #   "list_pending_download_jobs".
+
+    my ( $output, $onepass ) = @$_;
+
+    for
+    (
+        [ qw( pending   false   ) ],
+        [ qw( completed true    ) ],
+    )
+    {
+        my ( $status, $completed ) = @_;
+
+        for
+        (
+            [ qw( inventory Inventory   ) ],
+            [ qw( download  Download    ) ],
+        )
+        {
+            my ( $type, $action ) = @$_;
+
+            my $name    = join '_' => $output, $status, $type, 'jobs';
+
+            *{ qualify_to_ref $name }
+            = sub
+            {
+                # difference betwene "has_*" and "list_*" is that 
+                # former is hardwired for a limit of 1 job.
+
+                local @CARP_NOT = ( __PACKAGE__ );
+
+                my $vault   = shift;
+                my $limit   = $onepass ? 1 : shift;
+
+                # note: limit validation is dealt with in the api call.
+
+                for( ;; )
+                {
+                    my ( $cont, $found ) 
+                    = $vault->call_api
+                    (
+                        iterate_list_jobs => $limit, $status
+                    );
+
+                    # onepass: caller gets back true if N > 0 jobs.
+
+                    return !! @$found
+                    if $onepass;
+
+                    # otherwise accumulate the jobs until there is
+                    # nothing left.
+
+                    push @jobz, @$found;
+                    $cont       or last;
+                }
+
+                # not a one-pass lookup: hand back the list.
+
+                wantarray
+                ?  @jobz
+                : \@jobz
+            };
+        }
+    }
+}
+
+for
+(
+    [ qw( describe  describe_vault  ) ]
+)
+{
+    # downside to AUTOLOAD is that the names with "vault" are
+    # repetative with objects named "$vault".
+
+    my ( $install, $dispatch ) = splice @_, 0, 2;
+
+    *{ qualify_to_ref $install }
+    = sub
+    {
+        my $vault   = shift;
+
+        $vault->call_api( $dispatch => @_ )
+    };
+}
+
+########################################################################
+# manage general metadata
+
 sub verbose
 {
     shift;  # ignore the invocant
@@ -164,75 +267,6 @@ sub call_api
 ########################################################################
 # job and download management
 ########################################################################
-
-########################################################################
-# standard collection of job queries
-
-for
-(
-    [ has   => 1 ],
-    [ list  => 0 ],
-)
-{
-    my ( $output, $onepass ) = @$_;
-
-    for
-    (
-        [ qw( pending  false   ) ],
-        [ qw( completed true    ) ],
-    )
-    {
-        my ( $status, $completed ) = @_;
-
-        for
-        (
-            [ qw( inventory Inventory   ) ],
-            [ qw( download  Download    ) ],
-        )
-        {
-            my ( $type, $action ) = @$_;
-
-            my $name    = join '_' => $output, $status, $type, 'jobs';
-
-            *{ qualify_to_ref $name }
-            = sub
-            {
-                local @CARP_NOT = ( __PACKAGE__ );
-
-                my $vault   = shift;
-                my $limit   = $onepass ? 1 : shift;
-
-                # note: limit validation is dealt with in the api call.
-
-                for( ;; )
-                {
-                    my ( $cont, $found ) 
-                    = $vault->call_api
-                    (
-                        iterate_list_jobs => $limit, $status
-                    );
-
-                    # onepass: caller gets back true if N > 0 jobs.
-
-                    return !! @$found
-                    if $onepass;
-
-                    # otherwise accumulate the jobs until there is
-                    # nothing left.
-
-                    push @jobz, @$found;
-                    $cont       or last;
-                }
-
-                # not a one-pass lookup: hand back the list.
-
-                wantarray
-                ?  @jobz
-                : \@jobz
-            };
-        }
-    }
-}
 
 sub has_current_inventory
 {
