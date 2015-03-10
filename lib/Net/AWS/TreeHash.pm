@@ -6,11 +6,16 @@ use v5.20;
 use autodie;
 use experimental qw( lexical_subs autoderef );
 
-use Const::Fast;
+# Const::Fast does not play nice with blessing nested objects.
+# rather than use different locking mechanismis in different 
+# places I'll stick with dlock throughout.
+#use Const::Fast;
+
+use Data::Lock      qw( dlock           );
 
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
-use List::Util      qw( max             );
+use List::Util      qw( first max       );
 use Scalar::Util    qw( reftype         );
 use Symbol          qw( qualify_to_ref  );
 
@@ -25,7 +30,7 @@ $VERSION = eval $VERSION;
 # utility subs
 ########################################################################
 
-const my $reduce_hash =>
+dlock my $reduce_hash =
 sub
 {
     # iterate reducing the pairs of 1MiB data units to a single value.
@@ -34,12 +39,12 @@ sub
     return $_[0]
     if 2 > @_;
 
-    const my $chunks => ( @_ / 2 ) + ( @_ % 2 );
+    dlock( my $chunks  = ( @_ / 2 ) + ( @_ % 2 ) );
 
     @_  
     = map
     {
-        const my $i => 2 * ( $_ - 1 );
+        dlock( my $i = 2 * ( $_ - 1 ) );
 
         sha256 @_[ $i .. max( $i+1, $#_) ]
     }
@@ -48,11 +53,11 @@ sub
     goto __SUB__
 };
 
-const my $buffer_hash =>
+dlock my $buffer_hash =
 sub
 {
     state $format   = '(a' . 2**20 . ')*';
-    const my $buffer => shift;
+    dlock( my $buffer = shift );
 
     length $buffer
     or return;
@@ -69,27 +74,23 @@ sub
 
 sub import
 {
+    dlock state $exportz = 
+    {
+        tree_hash       => \&tree_hash,
+        tree_hash_hex   => \&tree_hash_hex,
+        reduce_hash     => $reduce_hash,
+        buffer_hash     => $buffer_hash,
+    };
+
     shift;
 
-    if( @_ )
+    dlock my $caller  = caller;
+
+    for( @_ )
     {
-        my $caller  = caller;
+        dlock my $ref   = $exportz->{ $_ };
 
-        for
-        (
-            [ tree_hash     => \&tree_hash      ],
-            [ tree_hash_hex => \&tree_hash_hex  ],
-            [ reduce_hash   => $reduce_hash     ],
-            [ buffer_hash   => $buffer_hash     ],
-        )
-        {
-            my ( $name, $ref ) = @$_;
-
-            grep { "$name" eq $_ } @_
-            or next;
-
-            *{ qualify_to_ref $name, $caller  } = $ref;
-        }
+        *{ qualify_to_ref $_, $caller  } = $ref;
     }
 
     return
@@ -104,7 +105,7 @@ sub tree_hash
     @_ > 1
     and croak 'Bogus tree_hash: multiple arguments';
 
-    const my $type  => reftype $_[0];
+    dlock( my $type  = reftype $_[0] );
     
     # caller gets back buffer_hash, reduce_hash, or death.
 
