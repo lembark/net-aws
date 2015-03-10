@@ -9,7 +9,7 @@ use experimental qw( lexical_subs autoderef );
 # Const::Fast does not play nice with blessing nested objects.
 # rather than use different locking mechanismis in different 
 # places I'll stick with dlock throughout.
-#use Const::Fast;
+# use Const::Fast;
 
 use Data::Lock      qw( dlock           );
 
@@ -74,6 +74,8 @@ sub
 
 sub import
 {
+$DB::single = 1;
+
     dlock state $exportz = 
     {
         tree_hash       => \&tree_hash,
