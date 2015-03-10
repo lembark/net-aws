@@ -6,12 +6,7 @@ use v5.20;
 use autodie;
 use experimental qw( lexical_subs autoderef );
 
-# Const::Fast does not play nice with blessing nested objects.
-# rather than use different locking mechanismis in different 
-# places I'll stick with dlock throughout.
-# use Const::Fast;
-
-use Data::Lock      qw( dlock           );
+use Net::AWS::Const;
 
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
@@ -30,7 +25,7 @@ $VERSION = eval $VERSION;
 # utility subs
 ########################################################################
 
-dlock my $reduce_hash =
+const my $reduce_hash =>
 sub
 {
     # iterate reducing the pairs of 1MiB data units to a single value.
@@ -39,12 +34,12 @@ sub
     return $_[0]
     if 2 > @_;
 
-    dlock( my $chunks  = ( @_ / 2 ) + ( @_ % 2 ) );
+    const my $chunks => ( @_ / 2 ) + ( @_ % 2 );
 
     @_  
     = map
     {
-        dlock( my $i = 2 * ( $_ - 1 ) );
+        const my $i => 2 * ( $_ - 1 );
 
         sha256 @_[ $i .. max( $i+1, $#_) ]
     }
@@ -53,11 +48,11 @@ sub
     goto __SUB__
 };
 
-dlock my $buffer_hash =
+const my $buffer_hash =>
 sub
 {
     state $format   = '(a' . 2**20 . ')*';
-    dlock( my $buffer = shift );
+    const my $buffer => shift;
 
     length $buffer
     or return;
@@ -74,7 +69,7 @@ sub
 
 sub import
 {
-    dlock state $exportz = 
+    const state $exportz =>
     {
         tree_hash       => \&tree_hash,
         tree_hash_hex   => \&tree_hash_hex,
@@ -84,11 +79,11 @@ sub import
 
     shift;
 
-    dlock my $caller  = caller;
+    const my $caller    => caller;
 
     for( @_ )
     {
-        dlock my $ref   = $exportz->{ $_ };
+        const my $ref   => $exportz->{ $_ };
 
         *{ qualify_to_ref $_, $caller  } = $ref;
     }
@@ -105,7 +100,7 @@ sub tree_hash
     @_ > 1
     and croak 'Bogus tree_hash: multiple arguments';
 
-    dlock( my $type  = reftype $_[0] );
+    const my $type  => reftype $_[0];
     
     # caller gets back buffer_hash, reduce_hash, or death.
 
