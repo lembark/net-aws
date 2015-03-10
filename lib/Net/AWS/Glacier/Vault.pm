@@ -18,6 +18,8 @@ use List::Util      qw( reduce                  );
 use Scalar::Util    qw( blessed refaddr         );
 use Symbol          qw( qualify_to_ref          );
 
+use Data::Lock      qw( dlock                   );
+
 use Net::AWS::Glacier::API;
 
 use overload 
@@ -200,6 +202,12 @@ sub initialize
 {
     my $vault   = shift;
     $$vault     = shift;
+
+    dlock $vault;
+
+    # at this point the vault is immutable.
+    # not so its inside-out data, but accessing a new vault
+    # requires creating a new object.
     
     # note that the name might be false for a factory object.
 
