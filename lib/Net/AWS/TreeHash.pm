@@ -74,8 +74,6 @@ sub
 
 sub import
 {
-$DB::single = 1;
-
     dlock state $exportz = 
     {
         tree_hash       => \&tree_hash,
