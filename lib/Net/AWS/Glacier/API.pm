@@ -33,6 +33,8 @@ our @CARP_NOT   = ( __PACKAGE__ );
 
 my  $verbose    = '';
 
+my @boolean     = qw( false true );
+
 ########################################################################
 # utility subs
 ########################################################################
@@ -889,78 +891,62 @@ sub get_job_output
 
 sub list_jobs
 {
-    ...;
+    my ( $api, $comp, $limit, $status, $marker ) = @_;
 
-    state $empty    = {};
+    $name
+    or croak "false vault name";
 
-    my $api     = shift;
-    my $name    = shift or croak "false vault name";
-    my $paramz  = shift || $empty;
+    $limit  //= 0;
 
-    $api->$loop_request
-    (
-        "/-/vaults/$name/jobs?limit=1000",
-        'JobList'
-    )
-}
-
-sub iterate_list_jobs
-{
-    state $limit_d      = 50;
-    state $comp_d       = 'true';
-    state $onepass_d    = '';
-    state $prior        = '';
-    state $count        =  0;
-
-    my $api     = shift;
-    my $name    = shift or croak "false vault name";
-    my $limit   = shift || $limit_d;
-    my $comp    = shift || $comp_d;
-    my $onepass = shift || $onepass_d;
-
-    if( $onepass )
+    if( $limit )
     {
-        $limit  = 1;
-        $prior  = '';
+        looks_like_number $limit  
+        or croak "non-numeric limit: '$limit'";
+    }
+    else
+    {
+        $limit  = '' if $limit < 1;
     }
 
-    my $request = "/-/vaults/$name/jobs?limit=$limit&completed=$comp";
+    if( $comp )
+    {
+        $comp eq 'false'
+        or
+        $comp = 'true';
+    }
+    elsif( defined $comp )
+    {
+        $comp
+        = $comp
+        ? 'true'
+        : 'false'
+        ;
+    }
+    else
+    {
+        $comp   = '';
+    }
 
-    $request    .= "&marker=$prior"
-    if $prior;
+    my $request = "/-/vaults/$name/jobs";
 
-    my $decoded = $api->$acquire_content( GET => $request );
+    my @argz    = ();
+
+    push @argz, qq{limit="$limit"}          if $limit   != '';
+    push @argz, qq{completed="$comp"}       if $comp    != '';
+    push @argz, qq{marker="$marker"}        if $marker  != '';
+    push @argz, qq{statuscode="$status"}    if $status  != '';
+
+    $request    .= '?' . join '&' => @argz
+    if $argz;
+
+    $api->$acquire_content( GET => $request )
 
     my $new     = $decoded->{ Marker    };
     my $jobz    = $decoded->{ JobList   };
 
-    if( $onepass )
-    {
-        $count  = 0;
-        $prior  = '';
-    }
-    else
-    {
-        my $n       = @$jobz;
-        $count      += $n;
-
-        say 
-        $prior && $new 
-        ? "Next list chunk: '$name' ($n, $count)"
-        : $new 
-        ? "Initial list chunk: '$name' ($n, $count)"
-        : $prior
-        ? "Final list chunk: '$name' ($n, $count)" 
-        : "Single list: '$name' ($n)" 
-        ;
-
-        $count  = 0 if ! $new;
-        $prior  = $new;
-    }
-
-    my $continue    = !! $new;
-
-    ( $continue => $jobz )
+    wantarray
+    ?  @jobz
+    : \@jobz
 }
 
 # keep require happy
@@ -1181,7 +1167,8 @@ This takes a vault name and deletes all notification events.
 =item list_jobs iterate_list_jobs describe_job
 
 list_jobs takes a vault name and returns all of the jobs available
-in one pass. 
+in one pass. This is equivalent to the loop shown below with
+$only_complete and $onepass as false and a push of @$job_list.
 
 iterate_list_jobs is I<not> part of the the AWS Glacier 
 specification but seems basic enough to include here. This 
@@ -1197,27 +1184,28 @@ one pass.
 
 Passing true for onepass forces the list limit to one job and will 
 always return false for continue. Its use is in quickly determining
-if any jobs are avilable at all without having to manage the entire
-list.
+if any jobs are avilable at all.
+
+    my @jobz    = ();
 
     for(;;)
     {
-        my ( $continue, $job_list ) 
-        = $api->iterate_list_jobs
+        my ( $continue, $job_list ) = $api->iterate_list_jobs
         (
             $vault_name,
             $list_limit,    # default 50
-            $only_complete, # default 'true'
-            $onepass        # default false, see below
+            '',             # default 'true'
+            '',             # default false, see below
         );
 
-        for my $job ( @$job_list )
-        {
-            # process the returned jobs
-        }
+        # or process the jobs in chunks ...
+
+        push @jobz, @$job_list;
 
         $continue or last;
     }
+
+    # at this point @jobz is all of the 
 
 
 =head3 Job status structure.
@@ -1506,6 +1494,7 @@ your bug as I make changes.
 =item AWS Glacier API documentation
 
 L<https://aws.amazon.com/documentation/glacier/>
+L<http://docs.aws.amazon.com/amazonglacier/latest/dev/amazon-glacier-api.html>
 
 This module uses the REST-ful API.
 
