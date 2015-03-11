@@ -24,3 +24,4 @@ nytprof.out
 t/00-*
 test.conf
 tmp
+*.out
