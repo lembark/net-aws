@@ -1,7 +1,7 @@
 ########################################################################
 # housekeeping
 ########################################################################
-package Net::AWS::TreeHash;
+package Net::AWS::Glacier::TreeHash;
 use v5.20;
 use autodie;
 use experimental qw( lexical_subs autoderef );
@@ -114,7 +114,7 @@ sub tree_hash
     }
     else
     {
-        croak "Bogus tree_hash: '$_' neither arrayref nor sting"
+        croak "Bogus tree_hash: '$_' neither arrayref nor string"
     }
 }
 
@@ -135,7 +135,7 @@ Glacier API (version 2012-06-01)
 
 Usage:
 
-    use Net::Amazon::TreeHash qw( tree_hash );
+    use Net::Amazon::Glacier::TreeHash qw( tree_hash );
 
     # simplest cases: compute the hash of a non-partitioned data.
 

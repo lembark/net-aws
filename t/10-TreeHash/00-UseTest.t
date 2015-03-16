@@ -5,7 +5,7 @@ use FindBin::libs;
 
 use Test::More;
 
-my $madness = 'Net::AWS::TreeHash';
+my $madness = 'Net::AWS::Glacier::TreeHash';
 
 require_ok $madness;
 

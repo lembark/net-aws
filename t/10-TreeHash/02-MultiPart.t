@@ -8,7 +8,7 @@ use Test::More;
 
 sub MiB()   { 2 ** 20 };
 
-use Net::AWS::TreeHash qw( tree_hash reduce_hash );
+use Net::AWS::Glacier::TreeHash qw( tree_hash reduce_hash );
 
 __PACKAGE__->can( $_ ) or BAIL_OUT "Failed import: '$_'"
 for qw( tree_hash reduce_hash );

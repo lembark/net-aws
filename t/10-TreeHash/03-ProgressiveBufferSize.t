@@ -11,7 +11,7 @@ use Digest::SHA qw( sha256          );
 
 sub MiB()   { 2 ** 20 };
 
-use Net::AWS::TreeHash qw( tree_hash reduce_hash );
+use Net::AWS::Glacier::TreeHash qw( tree_hash reduce_hash );
 
 my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
 my @buffsiz = map { 2 ** $_ } ( 0 .. 9 );

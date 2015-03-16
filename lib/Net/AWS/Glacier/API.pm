@@ -18,7 +18,7 @@ use Scalar::Util    qw( blessed reftype looks_like_number   );
 use Symbol          qw( qualify_to_ref                      );
 
 use Net::AWS::Signature::V4;
-use Net::AWS::TreeHash      qw( tree_hash tree_hash_hex );
+use Net::AWS::Glacier::TreeHash qw( tree_hash tree_hash_hex );
 
 use Exporter::Proxy qw( dispatch=glacier_api );
 

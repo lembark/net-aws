@@ -12,7 +12,7 @@ sub MiB()   { 2 ** 20 };
 
 my $madness = '';
 
-use Net::AWS::TreeHash qw( tree_hash );
+use Net::AWS::Glacier::TreeHash qw( tree_hash );
 
 __PACKAGE__->can( 'tree_hash' )
 or BAIL_OUT "'tree_hash' not installed";
