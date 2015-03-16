@@ -25,3 +25,6 @@ t/00-*
 test.conf
 tmp
 *.out
+foo
+bar
+foobar
