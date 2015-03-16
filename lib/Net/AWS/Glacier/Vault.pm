@@ -13,6 +13,7 @@ use File::Spec::Functions;
 use JSON::XS        qw( decode_json             );
 use XML::Simple     qw( xml_in                  );
 
+use Fcntl           qw( O_RDONLY                );
 use File::Basename  qw( basename dirname        );
 use List::Util      qw( reduce                  );
 use Scalar::Util    qw( blessed refaddr         );
@@ -41,9 +42,26 @@ my $default_format  = 'JSON';
 my %vault_argz      = ();
 my @arg_fieldz      = qw( api region key secret );
 
+sub MiB() { 2 ** 20 );
+
 ########################################################################
 # utility subs
 ########################################################################
+
+my $floor_mib
+= sub
+{
+    state $ln2  = log 2;
+
+    my $size    = shift or return;
+
+    my $exp     = int( log( $size ) / $ln2 );
+
+    $exp >= 20
+    or croak "Floor in MiB: '$size' < 1MiB ($exp)";
+
+    2 ** $exp
+};
 
 ########################################################################
 # methods
@@ -442,7 +460,7 @@ sub download_current_inventory
     my $time_d  = 3600 * 6;         # jobs can take up to 5 hours.
 
     my $vault   = shift;
-    my $dest    = shift // $dest_d;
+    my $dest    = shift;
     my $timeout = shift // $time_d;
 
     my $job_id  = '';
@@ -471,7 +489,7 @@ sub download_current_inventory
     {
         if( $vault->job_completed( $job_id ) )
         {
-            $path   = $vault->write_inventory( $job_id )
+            $path   = $vault->write_inventory( $job_id, $dest )
             and last;
         }
         elsif( $time > $cutoff )
@@ -554,7 +572,15 @@ sub write_archive
 
 sub write_inventory
 {
-    ...
+    state $dest_d  = './';
+
+    my $vault   = shift;
+    my $job_id  = shift or croak "false job_id";
+    my $dest    = shift // $dest_d';
+
+    my $statz   = $vault->call_api( describe_job => $job_id );
+    my $desc    = $statz->{ Description }
+
 }
 
 sub process_jobs
@@ -713,6 +739,95 @@ sub download_all_jobs
 
 ########################################################################
 # archive and upload management
+
+sub maximum_partition_size
+{
+    state $default  = 2 ** 30;
+    state $curr     = $default;
+
+    state $min      = 2 ** 20;
+    state $max      = 2 ** 32;
+
+    # caller gets back the current value either way.
+    # passing in false value resets to default.
+
+    if( @_ )
+    {
+        my $size    = shift || $default;
+
+        looks_like_number $size
+        or croak "Non-numeric maximum paritition size: '$size'";
+
+        $size < $min
+        and croak "Partition size to small: '$size' < $min";
+
+        $size > $max
+        and croak "Partition size to large: '$size' > $max";
+
+        $curr   = $floor_mib->( $size );
+    }
+
+    $curr
+}
+
+sub calculate_multipart_upload_partsize
+{
+    my $max_count   = 10_000;
+
+    my $api     = shift;
+    my $size    = shift or croak "False archive size";
+
+    looks_like_number $size
+    or croak "Non-numeric archive size: '$size'";
+
+    my $part    = $api->maximum_partition_size;
+    my $max     = $max_count * $part ;
+
+    $size > $max
+    and croak "Archive size too large for current partition: $part";
+
+    $part
+}
+
+
+sub upload_multipart
+{
+    state $chunk_d  = 128 * MiB;
+    state $buffer   = '';
+
+    my $vault   = shift;
+    my $file    = shift or croak "false file ($vault)";
+    my $desc    = shift or croak "false description ($vault)";
+    my $chunk   = shift || $chunk_d;
+
+    my $fh
+    = do
+    {
+        if( ref $file )
+        {
+            $file
+        }
+        elsif( -e $file )
+        {
+            sysopen my $fh, $file, 'O_RDONLY'
+
+            $fh
+        }
+        else
+        {
+            croak "file is neither a GLOB nor existing path: '$file'"
+        }
+    };
+}
+
+sub upload_singlepart
+{
+    my $vault   = shift;
+    my $file    = shift or croak "false file ($vault)";
+    my $desc    = shift or croak "false description ($vault)";
+
+   
+}
 
 sub upload_paths
 {

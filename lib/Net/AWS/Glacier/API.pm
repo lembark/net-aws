@@ -80,21 +80,6 @@ my $sanitize_description
     shift
 };
 
-my $floor_mib
-= sub
-{
-    state $ln2  = log 2;
-
-    my $size    = shift or return;
-
-    my $exp     = int( log( $size ) / $ln2 );
-
-    $exp >= 20
-    or croak "Floor in MiB: '$size' < 1MiB ($exp)";
-
-    2 ** $exp
-};
-
 ########################################################################
 # these take an object
 ########################################################################
@@ -569,55 +554,6 @@ sub delete_archive
 ########################################################################
 # multi-part archive operations
 ########################################################################
-
-sub maximum_partition_size
-{
-    state $default  = 2 ** 30;
-    state $curr     = $default;
-
-    state $min      = 2 ** 20;
-    state $max      = 2 ** 32;
-
-    # caller gets back the current value either way.
-    # passing in false value resets to default.
-
-    if( @_ )
-    {
-        my $size    = shift || $default;
-
-        looks_like_number $size
-        or croak "Non-numeric maximum paritition size: '$size'";
-
-        $size < $min
-        and croak "Partition size to small: '$size' < $min";
-
-        $size > $max
-        and croak "Partition size to large: '$size' > $max";
-
-        $curr   = $floor_mib->( $size );
-    }
-
-    $curr
-}
-
-sub calculate_multipart_upload_partsize
-{
-    my $max_count   = 10_000;
-
-    my $api     = shift;
-    my $size    = shift or croak "False archive size";
-
-    looks_like_number $size
-    or croak "Non-numeric archive size: '$size'";
-
-    my $part    = $api->maximum_partition_size;
-    my $max     = $max_count * $part ;
-
-    $size > $max
-    and croak "Archive size too large for current partition: $part";
-
-    $part
-}
 
 sub multipart_upload_init
 {
