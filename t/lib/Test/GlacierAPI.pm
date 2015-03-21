@@ -11,7 +11,7 @@ use Test::More;
 
 use Symbol      qw( qualify_to_ref );
 
-use Net::AWS::Signature::V4;
+use Net::AWS::Glacier::Signature;
 
 ########################################################################
 # package variables

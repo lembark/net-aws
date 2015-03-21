@@ -17,7 +17,7 @@ use List::Util      qw( first                               );
 use Scalar::Util    qw( blessed reftype looks_like_number   );
 use Symbol          qw( qualify_to_ref                      );
 
-use Net::AWS::Signature::V4;
+use Net::AWS::Glacier::Signature;
 use Net::AWS::Glacier::TreeHash qw( tree_hash tree_hash_hex );
 
 use Exporter::Proxy qw( dispatch=glacier_api );
@@ -827,7 +827,7 @@ sub get_job_output
 
 sub list_jobs
 {
-    my ( $api, $comp, $limit, $status, $marker ) = @_;
+    my ( $api, $name, $comp, $limit, $status, $marker ) = @_;
 
     $name
     or croak "false vault name";

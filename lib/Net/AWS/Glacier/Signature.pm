@@ -1,7 +1,7 @@
 ########################################################################
 # housekeeping
 ########################################################################
-package Net::AWS::Signature::V4;
+package Net::AWS::Glacier::Signature;
 use v5.20;
 use autodie;
 use experimental qw( lexical_subs );
