@@ -9,6 +9,7 @@ use Carp;
 use Const::Fast;
 use Data::Dumper;
 use File::Spec::Functions;
+use NEXT;
 
 use JSON::XS        qw( decode_json             );
 use XML::Simple     qw( xml_in                  );
@@ -248,16 +249,25 @@ sub new
 {
     my $vault   = &construct;
 
-    $vault->intialize( @_ );
+    $vault->EVERY::LAST::intialize( @_ );
 
     $vault
+}
+
+sub cleanup
+{
+    my $vault = shift;
+
+    delete $vault_argz{ refaddr $vault }
+
+    return
 }
 
 DESTROY
 {
     my $vault = shift;
 
-    delete $vault_argz{ refaddr $vault }
+    $vault->EVERY::cleanup;
 
     return
 }
@@ -613,7 +623,7 @@ sub process_jobs
 ########################################################################
 # acquire job contents: inventory or archive.
 
-sub download_completed_job
+sub download_avilable_job
 {
     # avoid re-processing jobs we've alrady snagged.
 
@@ -871,30 +881,61 @@ AWS::Glacier::API
 
 =head1 SYNOPSIS
 
+ASIDE: This code is still alpha, so is this documentation. Until 
+the code is a bit more stable, please reference the method names
+for specific of how they are used.
+
+    # Note: these all croak on errors.
     # package or object, same results.
 
     my $vebose  = Net::AWS::Glacier::Util->verbose;
     my $vebose  = Net::AWS::Glacier::Util->verbose( 1 );
     my $vebose  = Net::AWS::Glacier::Util->verbose( '' );
 
-    # these all croak on errors.
+    # vault name is 'user-data'.
+    # object is an immutable refernce to 'user-data'.
 
-    # util object dispatches API calls into Net::AWS::Glacier::API.
+    my $vault = Net::AWS::Glacier::Vault->new
+    (
+        'user-data',
+        region  => $region,
+        key     => $user_key,
+        secret  => $user_secret,
+    );
+
+    # vaults inherit from an object used to dispatch new.
+    # this simplifies managing multiple vaults.
+    #
+    # name for factory is optional;
+    # name for specific vaults is required with the region, key,
+    # secret inherited if they are available.
 
     my $factory = Net::AWS::Glacier::Vault->new
     (
         ''
-        $region,
-        $user_key,
-        $user_secret
+        region  => $region,
+        key     => $user_key,
+        secret  => $user_secret,
     );
 
-    my $vault   = $factory->vault( 'vault_name' );
+    for my $name ( @vault_namz )
+    {
+        my $vault   = $factory->new( $name );
+        $vault->...
+    }
+
+    # or to, say, download all of the completed jobs for all of
+    # the vaults on a list use. 
+
+    $factory->new( $_ )->download_all_jobs
+    for @vault_namz;
 
     # push a list of files into glacier. default description is 
     # the path. returns a hash[ref] of path => archive_id.
     # false explicit descriptions are set to the path (i.e., this
     # won't let you upload with a false description).
+    #
+    # my %path2arch = ... works also.
 
     my $path2arch = $vault->upload_paths
     (
@@ -903,21 +944,11 @@ AWS::Glacier::API
         ...
     );
 
-    my $path2arch = $vault->upload_paths
-    (
-        {
-            path => '',     # use path for description
-            path => desc,   # use explicit description
-            ...
-        }
-    );
-
     # download and record any completed jobs,
     # loop w/ 1-hour wait while any pending jobs.
 
     my @local   = $vault->download_all_jobs
     (
-        $vault_name,    # required
         $dest_dir       # optional, defaults to '.'
     );
 

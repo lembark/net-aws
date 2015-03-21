@@ -9,6 +9,7 @@ use experimental    qw( lexical_subs );
 use HTTP::Request;
 use JSON 2.61;
 use LWP::UserAgent;
+use NEXT;
 use POSIX;
 
 use Carp            qw( carp croak                          );
@@ -30,9 +31,7 @@ our $VERSION    = '0.16';
 $VERSION        = eval $VERSION;
 
 our @CARP_NOT   = ( __PACKAGE__ );
-
 my  $verbose    = '';
-
 my @boolean     = qw( false true );
 
 ########################################################################
@@ -367,7 +366,7 @@ sub initialize
 sub new
 {
     my $api = &construct;
-    $api->initialize( @_ );
+    $api->EVERY::LAST::initialize( @_ );
     $api
 }
 
