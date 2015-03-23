@@ -5,29 +5,10 @@ package Net::AWS::Glacier::Vault::Upload;
 use v5.20;
 use autodie;
 
-use Carp;
-use Const::Fast;
-use Data::Dumper;
 use File::Spec::Functions;
-use NEXT;
 
-use JSON::XS        qw( decode_json             );
-use XML::Simple     qw( xml_in                  );
-
-use Fcntl           qw( O_RDONLY                );
-use File::Basename  qw( basename dirname        );
-use List::Util      qw( reduce                  );
-use Scalar::Util    qw( blessed refaddr         );
-use Symbol          qw( qualify_to_ref          );
-
-use Data::Lock      qw( dlock                   );
-
-use Net::AWS::Glacier::API;
-
-use overload 
-    q{"}    => sub { my $vault = shift; $$vault }
-    q{bool} => sub { my $vault = shift; !! $$vault }
-;
+use Carp    qw( carp croak  );
+use Fcntl   qw( O_RDONLY    );
 
 ########################################################################
 # package variables
@@ -219,8 +200,7 @@ Net::AWS::Glacier::Vault::Upload - high-level upload functionality.
 
 =head1 SYNOPSIS
 
-    # see Net::AWS::Glacier::Vault for usage.
-    # this documents *internals* only.
+    # see Net::AWS::Glacier::Vault for usage examples.
 
 =head1 DESCRIPTION
 
@@ -285,7 +265,6 @@ to get dynamic behavior based on system load.
 =item upload_multipart
 
 =back
-
 
 
 =head1 SEE ALSO
