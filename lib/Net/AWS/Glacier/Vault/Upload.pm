@@ -19,7 +19,6 @@ $VERSION        = eval $VERSION;
 
 our @CARP_NOT   = ( __PACKAGE__ );
 
-my $default_format  = 'JSON';
 my %vault_argz      = ();
 my @arg_fieldz      = qw( api region key secret );
 

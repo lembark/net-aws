@@ -36,7 +36,6 @@ $VERSION        = eval $VERSION;
 our @CARP_NOT   = ();
 
 my $verbose         = '';
-my $default_format  = 'JSON';
 my @arg_fieldz      = qw( api region key secret );
 my %vault_argz      = ();
 
