@@ -12,7 +12,6 @@ use File::Spec::Functions;
 use NEXT;
 
 use JSON::XS        qw( decode_json             );
-use XML::Simple     qw( xml_in                  );
 
 use Fcntl           qw( O_RDONLY                );
 use File::Basename  qw( basename dirname        );
