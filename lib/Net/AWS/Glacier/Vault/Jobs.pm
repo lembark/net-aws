@@ -5,6 +5,17 @@
 package Net::AWS::Glacier::Vault::Jobs;
 use v5.20;
 
+use Carp    qw( croak   );
+
+use Exporter::Proxy
+qw
+(
+    iterate_list_jobs
+    list_jobs
+    filter_jobs
+    job_status
+);
+
 ########################################################################
 # package variables
 ########################################################################
@@ -104,7 +115,7 @@ sub filter_jobs
     my $vault   = shift;
     my %argz    = @_;
 
-    my $filter  = delete $tmp{ filter }
+    my $filter  = delete $argz{ filter }
     or croak "filter_jobs: missing/false filter value";
 
     grep { $filter->( $_ ) } $vault->list_jobs( %argz )
@@ -113,6 +124,7 @@ sub filter_jobs
 sub job_status
 {
     my $vault   = shift;
+
     my $job_id  = shift
     or croak "false job_id";
 
