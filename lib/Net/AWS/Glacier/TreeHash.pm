@@ -6,13 +6,13 @@ use v5.20;
 use autodie;
 use experimental qw( lexical_subs autoderef );
 
-use Net::AWS::Const;
-
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
-use List::Util      qw( first max       );
+use List::Util      qw( max             );
 use Scalar::Util    qw( reftype         );
 use Symbol          qw( qualify_to_ref  );
+
+use Net::AWS::Const qw( const           );
 
 ########################################################################
 # package variables

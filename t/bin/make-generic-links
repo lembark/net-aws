@@ -2,7 +2,7 @@
 
 cd $(dirname $0)/..;
 
-rm -f ./0*.t;
+rm -f ./00*.t;
 
 find ../lib/ -name '*.pm'                           |
 perl -MList::Util=first -n                          \
