@@ -5,12 +5,27 @@
 package Net::AWS::Glacier::Vault::Download;
 use v5.20;
 
+use Carp                    qw( carp croak  );
+use File::Spec::Functions   qw( catfile     );
+
 ########################################################################
 # package variables
 ########################################################################
 
 our $VERSION = '0.01';
 eval $VERSION;
+
+our @CARP_NOT   = ( __PACKAGE__ );
+
+use Exporter::Proxy
+qw
+(
+    write_archive
+    write_inventory
+    process_jobs
+    download_avilable_job
+    download_all_jobs
+);
 
 ########################################################################
 # output contents of jobs once they are completed
@@ -82,11 +97,10 @@ sub write_inventory
 
     my $vault   = shift;
     my $job_id  = shift or croak "false job_id";
-    my $dest    = shift // $dest_d';
+    my $dest    = shift // $dest_d;
 
     my $statz   = $vault->call_api( describe_job => $job_id );
     my $desc    = $statz->{ Description }
-
 }
 
 sub process_jobs
@@ -121,9 +135,6 @@ sub download_avilable_job
     # avoid re-processing jobs we've alrady snagged.
 
     state $seen     = {};
-
-    local @CARP_NOT = ( __PACKAGE__ );
-
     state $writerz = 
     {
         qw
@@ -132,7 +143,8 @@ sub download_avilable_job
             InventoryRetrieval  write_inventory
         )
     };
-    state $seen = {};
+
+    local @CARP_NOT = ( __PACKAGE__ );
 
     my $vault   = shift;
     my $dest    = shift || '.';
