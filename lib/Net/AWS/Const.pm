@@ -5,7 +5,7 @@ package Net::AWS::Const;
 use v5.20;
 use autodie;
 
-use Carp        qw( carp            );
+use Carp        qw( carp croak      );
 use Data::Lock  qw( dlock           );
 use Symbol      qw( qualify_to_ref  );
 
@@ -26,6 +26,8 @@ our $debug  = $ENV{ DEBUG_NET_AWS_CONST } || '';
 
 sub const : lvalue
 {
+    # lvalue delays dlock until after state sets its own magic flag.
+
     $_[0] = $_[1] if @_ > 1;
 
     $_[0] // carp "Fixing undefined value"
@@ -40,9 +42,17 @@ sub const : lvalue
 
 sub import
 {
-    my $caller  = caller;
+    state $def  = 'const';
 
-    *{ qualify_to_ref const => $caller } = \&const;
+    # dicard the dispatching class.
+
+    shift;
+
+    my $caller  = caller;
+    my $name    = @_ ? shift : $def
+    or croak "Bogus Net::AWS::Const: false name";
+
+    *{ qualify_to_ref $name => $caller } = \&const;
 
     return
 }
@@ -66,10 +76,19 @@ Net::AWS::Const -- assign a constant to a variable or symbol.
     const my    $foo    => 'bar';
     const state $bletch => 'blort';
 
-    # this will carp, but still does the deed.
-    # this leaves verbose undef throuhout execution.
+    # pick a name, any name...
+
+    use Net::AWS::Const qw( value );
+
+    value my $foo => 'bar';
+
+    # take an existing varaible and make it const.
 
     const my $verbose;
+
+    # this will carp if debug is set, but works.
+
+    const my $flag => undef;
 
 =head1 DESCRIPTION
 
