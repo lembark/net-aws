@@ -872,16 +872,16 @@ sub list_jobs
     push @argz, qq{statuscode="$status"}    if $status  != '';
 
     $request    .= '?' . join '&' => @argz
-    if $argz;
+    if @argz;
 
-    $api->$acquire_content( GET => $request )
+    my $decoded = $api->$acquire_content( GET => $request );
 
     my $new     = $decoded->{ Marker    };
     my $jobz    = $decoded->{ JobList   };
 
     wantarray
-    ?  @jobz
-    : \@jobz
+    ? @$jobz
+    :  $jobz
 }
 
 # keep require happy
