@@ -10,6 +10,21 @@ use File::Spec::Functions;
 use Carp    qw( carp croak  );
 use Fcntl   qw( O_RDONLY    );
 
+use Exporter::Proxy
+qw
+(
+    maximum_partition_size
+    default_partition_size
+    minimum_partition_size
+
+    current_partition_size
+
+    calculate_multipart_upload_partsize
+    upload_multipart
+    upload_singlepart
+    upload_paths
+);
+
 ########################################################################
 # package variables
 ########################################################################
@@ -19,22 +34,19 @@ $VERSION        = eval $VERSION;
 
 our @CARP_NOT   = ( __PACKAGE__ );
 
-my %vault_argz      = ();
-my @arg_fieldz      = qw( api region key secret );
+my %vault_argz  = ();
+my @arg_fieldz  = qw( api region key secret );
+my $verbose     = '';
 
-sub MiB() { 2 ** 20 );
-
-# eventually this needs to get pushed into AWS::Configure.
-
-my $verbose         = $ENV{ VERBOSE_NET_AWS_GLACIER_VAULT_UPLOAD };
-
-my max_part = 2 ** 20;
-my def_part = 2 ** 27;
-my min_part = 2 ** 32;
+my $min_part    = 2 ** 20;
+my $def_part    = 2 ** 27;
+my $max_part    = 2 ** 32;
 
 ########################################################################
 # utility subs
 ########################################################################
+
+sub MiB()   { 2 ** 20 }
 
 my $floor_mib
 = sub
@@ -70,10 +82,9 @@ sub verbose
 sub maximum_partition_size { $max_part }
 sub default_partition_size { $def_part }
 sub minimum_partition_size { $min_part }
-
-sub maximum_partition_size
+sub current_partition_size
 {
-    state $curr = $def;
+    state $curr = $def_part;
 
     my $vault   = shift;
 
@@ -118,7 +129,6 @@ sub calculate_multipart_upload_partsize
     $part
 }
 
-
 sub upload_multipart
 {
     state $chunk_d  = 128 * MiB;
@@ -138,7 +148,7 @@ sub upload_multipart
         }
         elsif( -e $file )
         {
-            sysopen my $fh, $file, 'O_RDONLY'
+            sysopen my $fh, $file, 'O_RDONLY';
 
             $fh
         }
