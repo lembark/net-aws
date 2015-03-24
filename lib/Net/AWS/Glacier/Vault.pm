@@ -90,7 +90,7 @@ for
         [ qw( completed true    ) ],
     )
     {
-        my ( $status, $complete ) = @_;
+        my ( $status, $complete ) = @$_;
 
         for
         (
@@ -98,8 +98,6 @@ for
             [ qw( download  Download    ) ],
         )
         {
-$DB::single = 1;
-
             state $filterz  = {};
 
             my ( $type, $action ) = @$_;

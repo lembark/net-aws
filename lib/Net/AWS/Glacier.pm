@@ -1,18 +1,26 @@
 ########################################################################
 # housekeeping
 ########################################################################
+
 package Net::AWS::Glacier;
 use v5.20;
 use autodie;
 
-use Scalar::Util    qw( blessed );
-use Symbol          qw( qualify );
+use Carp    qw( carp croak  );
+use Symbol  qw( qualify     );
 
-our $VERSION='1.00';
-eval $VERSION;
-
-use Net::AWS::Glacier::Vault;
 use Net::AWS::Glacier::API;
+use Net::AWS::Glacier::Vault;
+
+########################################################################
+# package variables
+########################################################################
+
+our $VERSION='0.01';
+
+########################################################################
+# methods 
+########################################################################
 
 sub glacier
 {
