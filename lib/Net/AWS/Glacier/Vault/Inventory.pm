@@ -12,6 +12,15 @@ use v5.20;
 our $VERSION    = '0.01';
 eval $VERSION;
 
+use Exporter::Proxy
+qw
+(
+    last_inventory
+    has_current_inventory
+    has_pending_inventory
+    download_current_inventory
+);
+
 ########################################################################
 # methods
 ########################################################################
@@ -116,7 +125,7 @@ sub download_current_inventory
             $path   = $vault->write_inventory( $job_id, $dest )
             and last;
         }
-        elsif( $time > $cutoff )
+        elsif( time > $cutoff )
         {
             die "Cutoff time exceeded: '$job_id'";
         }
