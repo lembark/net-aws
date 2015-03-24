@@ -6,8 +6,8 @@ package Net::AWS::Glacier::Vault;
 use v5.20;
 use autodie;
 use overload 
-    q{"}    => sub { my $vault = shift; $$vault }
-    q{bool} => sub { my $vault = shift; !! $$vault }
+    q{"}    => sub { my $vault = shift; $$vault     },
+    q{bool} => sub { my $vault = shift; !! $$vault  },
 ;
 
 use Carp;
@@ -16,15 +16,15 @@ use NEXT;
 use Scalar::Util    qw( blessed refaddr         );
 use Symbol          qw( qualify_to_ref          );
 
+use Net::AWS::Const;
 use Net::AWS::Glacier::API;
-use Net::AWS::Glacier::Const;
 
 # break methods up into usable chunks.
 
 use Net::AWS::Glacier::Vault::Download;
 use Net::AWS::Glacier::Vault::Inventory;
 use Net::AWS::Glacier::Vault::Jobs;
-use Net::AWS::Glacier::Vault::Upload.pm;
+use Net::AWS::Glacier::Vault::Upload;
 
 ########################################################################
 # package variables
@@ -38,8 +38,6 @@ our @CARP_NOT   = ();
 my $verbose         = '';
 my @arg_fieldz      = qw( api region key secret );
 my %vault_argz      = ();
-
-sub MiB() { 2 ** 20 );
 
 ########################################################################
 # this module contains code for:
@@ -108,7 +106,7 @@ $DB::single = 1;
 
             my $name    = join '_' => $output, $status, $type, 'jobs';
 
-            my $filter  = $filterz{ $action }
+            my $filter  = $filterz->{ $action }
             ||= sub
             {
                 my $job_statz   = shift;
@@ -234,7 +232,7 @@ sub cleanup
 {
     my $vault = shift;
 
-    delete $vault_argz{ refaddr $vault }
+    delete $vault_argz{ refaddr $vault };
 
     return
 }
@@ -257,7 +255,7 @@ sub call_api
 {
     my $vault   = shift;
     my $name    = $$vault
-    || croak "Botched call_api: vault must have a name";
+    || croak "Botched call_api: vault has false name";
 
     my $op  = shift
     or croak "Bogus call_api: missing operation ($name)";
@@ -265,12 +263,16 @@ sub call_api
     my $argz    = $vault_argz{ refaddr $vault }
     or croak "Un-initialized vault: '$vault'";
 
+    # install new API object for the vault. 
+    # depending on how the vaults are used this might be usable as
+    # a shared object, but for now this works.
+
     my $api     = $argz->[0]
     ||= do
     {
         state $proto    = 'Net::AWS::Glacier::API';
 
-        $proto->new( @{ $argz }[ 1 .. $#arg_fieldz ]
+        $proto->new( @{ $argz }[ 1 .. $#arg_fieldz ] )
     };
 
     $api->glacier_api( $op, $name, @_ )
