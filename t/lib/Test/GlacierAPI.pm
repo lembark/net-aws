@@ -92,7 +92,7 @@ sub import
 
     my $caller  = caller;
 
-    Net::AWS::Signature::V4->verbose
+    Net::AWS::Glacier::Signature->verbose
     (
         !! $ENV{ GLACIER_TEST_VERBOSE }
     );

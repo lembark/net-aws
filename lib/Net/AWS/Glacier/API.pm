@@ -348,7 +348,7 @@ sub initialize
     my $key     = shift or croak "false 'key'";
     my $secret  = shift or croak "false 'secret'";
 
-    my $sig     = Net::AWS::Signature::V4->new
+    my $sig     = Net::AWS::Glacier::Signature->new
     (
         $key, $secret, $region, 'glacier'
     );
@@ -1437,9 +1437,9 @@ This module uses the REST-ful API.
 
 Higher-level calls for download, upload, vault and job management.
 
-=item Net::Amazon::Signature::V4 Net::Amazon::TreeHash
+=item Net::Amazon::Glacier::Signature Net::Amazon::Glacier::TreeHash
 
-Alternate implementations of the AWS API.
+Sign headers, generate treehash values.
 
 =back
 
