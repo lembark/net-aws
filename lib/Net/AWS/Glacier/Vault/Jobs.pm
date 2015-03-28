@@ -10,7 +10,6 @@ use Carp    qw( croak   );
 use Exporter::Proxy
 qw
 (
-    iterate_list_jobs
     list_jobs
     filter_jobs
     job_status
@@ -40,43 +39,6 @@ sub verbose
 # jobs
 ########################################################################
 
-sub iterate_list_jobs
-{
-    state $limit_d  = 50;
-    state $marker   = '';
-
-    my $vault   = shift;
-
-    my $comp    = shift // '';
-    my $limit   = shift // $limit_d;
-    my $status  = shift // '';
-    my $onepass = shift // '';
-
-    if( $onepass )
-    {
-        $limit  = 1;
-        $marker = '';
-    }
-
-    # NB: limit default && validation is dealt with 
-    # inside the api call.
-
-    my $decoded 
-    = $vault->call_api
-    (
-        list_jobs =>
-        $comp,
-        $limit,
-        $status,
-        $marker
-    );
-
-    $marker     = $onepass ? '' : $decoded->{ Marker    };
-    my $jobz    = $decoded->{ JobList   };
-
-    ( !! $marker, $jobz )
-}
-
 sub list_jobs
 {
     my $vault   = shift;
@@ -95,9 +57,9 @@ sub list_jobs
     for(;;)
     {
         my ( $continue, $jobz ) 
-        = $vault->iterate_list_jobs
+        = $vault->call_api
         (
-            @passthru
+            iterate_list_jobs => @passthru
         );
 
         push @jobz, @$jobz;
@@ -151,38 +113,19 @@ Net::AWS::Glacier::Vault::Jobs -- internals of job management.
 
 =head2 DESCRIPTION
 
-    # sub, not method.
-    # set verbosity, default $ENV{ VERBOSE_NET_AWS_GLACIER_VAULT_JOBS }
-
-    Net::AWS::Glacier::Vault::Jobs::verbose( 1 );
-
-    # onepass is used by has_* interfaces;
-    # hardwires limit = 1, returns false for continue.
-    #
-    # note the positional interface.
-
-    my ( $continue, $jobs ) 
-    = $vault->iterate_list_jobs
-    (
-
-        $complete,  # default ignore
-        $limit,     # default 50 jobs per call
-        $status,    # default ignore
-        $onepass    # default false
-
-    );
-
-    # iterates calling iterate_list_jobs, returnsn all jobs 
-    # as a single array.
-    #
-    # or my @jobz = $vault->list_jobs( ... );
+    # returns all jobs as a single array[ref].
+    # if complete & statuscode filter the request to [in]complete
+    # jobs only or jobs with code of Incomplete/Successful/Failed.
+    # limit defaults to 50, unless onepass is true.
+    # onepass is used for "has_*" interfaces, it requests a single
+    # job only.
     
     my $jobz
     = $vault->list_jobs
     (
         complete    => $boolean,
-        limit       => $count,
         statuscode  => $status,
+        limit       => $count,
         onepass     => $boolean
     );
 
@@ -199,7 +142,7 @@ Net::AWS::Glacier::Vault::Jobs -- internals of job management.
         filter      => sub { ... },
     );
 
-    # returns status code (Success/Failed) for completed jobs 
+    # returns status code (Successful/Failed) for completed jobs 
     # or undef for incomlete jobs. 
 
     for my $job_id ( ... )
@@ -207,13 +150,19 @@ Net::AWS::Glacier::Vault::Jobs -- internals of job management.
         my $status = $vault->job_status( $job_id )
         or next;
 
-        # $status is one of qw( Successful Failed )
+        # qw( Successful Failed )
+
+        say "Job completed with status: $status";
     }
 
 
 =head1 SEE ALSO
 
 =over 4
+
+=item Low-level API
+
+Net::AWS::Glacier::API
 
 =item AWS Glacier docs
 

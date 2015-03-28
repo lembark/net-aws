@@ -314,6 +314,66 @@ my $upload_single_archive
     $arch_id
 };
 
+my $list_jobs
+= sub
+{
+    my ( $api, $name, $comp, $limit, $status, $marker ) = @_;
+
+    $name   or croak "false vault name";
+
+    $limit  //= 0;
+
+    if( $limit )
+    {
+        looks_like_number $limit  
+        or croak "non-numeric limit: '$limit'";
+    }
+    else
+    {
+        $limit  = '' if $limit < 1;
+    }
+
+    if( $comp )
+    {
+        $comp eq 'false'
+        or
+        $comp = 'true';
+    }
+    elsif( defined $comp )
+    {
+        $comp
+        = $comp
+        ? 'true'
+        : 'false'
+        ;
+    }
+    else
+    {
+        $comp   = '';
+    }
+
+    my $request = "/-/vaults/$name/jobs";
+
+    my @argz    = ();
+
+    push @argz, qq{limit="$limit"}          if $limit   != '';
+    push @argz, qq{completed="$comp"}       if $comp    != '';
+    push @argz, qq{marker="$marker"}        if $marker  != '';
+    push @argz, qq{statuscode="$status"}    if $status  != '';
+
+    $request    .= '?' . join '&' => @argz
+    if @argz;
+
+    my $decoded = $api->$acquire_content( GET => $request );
+
+    my $new     = $decoded->{ Marker    };
+    my $jobz    = $decoded->{ JobList   };
+
+    wantarray
+    ? @$jobz
+    :  $jobz
+};
+
 ########################################################################
 # methods
 ########################################################################
@@ -445,6 +505,7 @@ for
         $api->$handler( $op => "/-/vaults/$vault$post" )
     };
 }
+
 
 sub list_vaults
 {
@@ -826,62 +887,56 @@ sub get_job_output
 
 sub list_jobs
 {
-    my ( $api, $name, $comp, $limit, $status, $marker ) = @_;
+    state $limit_d  = 50;
+    state $marker   = '';
 
-    $name
-    or croak "false vault name";
+    my $api     = shift;
+    my $name    = shift;
 
-    $limit  //= 0;
-
-    if( $limit )
+    if( defined $name )
     {
-        looks_like_number $limit  
-        or croak "non-numeric limit: '$limit'";
+        $name
+        or croak "Bogus iterate_list_jobs: false vault name";
+    }
+    elsif( @_ )
+    {
+        croak "Bogus iterate_list_jobs: undefined vault name";
     }
     else
     {
-        $limit  = '' if $limit < 1;
+        # reset the marker on aborted listing.
+
+        $marker = '';
+        return
     }
 
-    if( $comp )
+    my $comp    = shift // '';
+    my $limit   = shift // $limit_d;
+    my $status  = shift // '';
+    my $onepass = shift // '';
+
+    if( $onepass )
     {
-        $comp eq 'false'
-        or
-        $comp = 'true';
-    }
-    elsif( defined $comp )
-    {
-        $comp
-        = $comp
-        ? 'true'
-        : 'false'
-        ;
-    }
-    else
-    {
-        $comp   = '';
+        $limit  = 1;
+        $marker = '';
     }
 
-    my $request = "/-/vaults/$name/jobs";
+    # NB: limit default && validation is dealt with 
+    # inside the api call.
 
-    my @argz    = ();
+    my $decoded 
+    = $api->$list_jobs
+    (
+        $comp,
+        $limit,
+        $status,
+        $marker
+    );
 
-    push @argz, qq{limit="$limit"}          if $limit   != '';
-    push @argz, qq{completed="$comp"}       if $comp    != '';
-    push @argz, qq{marker="$marker"}        if $marker  != '';
-    push @argz, qq{statuscode="$status"}    if $status  != '';
-
-    $request    .= '?' . join '&' => @argz
-    if @argz;
-
-    my $decoded = $api->$acquire_content( GET => $request );
-
-    my $new     = $decoded->{ Marker    };
+    $marker     = $onepass ? '' : $decoded->{ Marker    };
     my $jobz    = $decoded->{ JobList   };
 
-    wantarray
-    ? @$jobz
-    :  $jobz
+    ( !! $marker, $jobz )
 }
 
 # keep require happy
@@ -922,6 +977,25 @@ Version 0.01
     my $hashref = $api->list_vaults;
     my $hashref = $api->describe_vault( $vault_name );
     my $hashref = $api->get_vault_notifications( $vault_name );
+
+    # onepass simplifies boolean interfaces: 
+    # hardwires limit = 1, returns false for continue.
+    #
+    # manages marker sequence internally, call until $continue
+    # returns false.
+
+    my ( $continue, $jobs ) 
+    = $vault->list_jobs
+    (
+        $complete,  # default: ignore
+        $limit,     # default: 50 jobs per call
+        $status,    # default: ignore
+        $onepass    # default: false
+    );
+
+    # reset marker if $continue is true and iteration is aborted.
+
+    $vault->list_jobs( undef );
 
     $api->delete_vault_notifications( $vault_name );
     $api->set_vault_notifications
