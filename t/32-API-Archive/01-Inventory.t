@@ -17,9 +17,9 @@ SKIP:
     my $vault
     = eval
     {
-        my $name    = "test-glacier";
+        my $name    = "test-glacier-$$";
 
-        $glacier->create_vault( $name )
+        $api->create_vault( $name )
         or BAIL_OUT "Failed create vault: '$name' ($@_)";
 
         $name
@@ -29,7 +29,7 @@ SKIP:
     my $desc
     = eval
     {
-        $glacier->describe_vault( $vault )
+        $api->describe_vault( $vault )
     }
     or do
     {
@@ -44,7 +44,7 @@ SKIP:
         # this will fail due to the lack of an existing inventory
         # for the vault.
 
-        $glacier->initiate_inventory_retrieval( $vault, 'JSON' )
+        $api->initiate_inventory_retrieval( $vault, 'JSON' )
     };
 
     note 'Error:', $@;
@@ -61,12 +61,11 @@ SKIP:
 
     eval
     {
-        $glacier->delete_vault( $vault )
+        $api->delete_vault( $vault )
         and
         pass "Vault deleted: '$vault'"
     }
     or diag "Failed delete vault: '$vault' ($@)";
-
 };
 
 done_testing;

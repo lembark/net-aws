@@ -99,7 +99,7 @@ sub import
 
     diag "Install: API object -> $caller";
 
-    *{ qualify_to_ref glacier => $caller } = \( $madness->new( @$credz ) );
+    *{ qualify_to_ref api => $caller } = \( $madness->new( @$credz ) );
 
     return
 }
