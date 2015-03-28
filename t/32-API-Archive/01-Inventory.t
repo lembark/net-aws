@@ -17,7 +17,7 @@ SKIP:
     my $vault
     = eval
     {
-        my $name    = "test-glacier-$$";
+        my $name    = "test-glacier";
 
         $glacier->create_vault( $name )
         or BAIL_OUT "Failed create vault: '$name' ($@_)";
