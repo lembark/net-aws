@@ -24,9 +24,9 @@ SKIP:
         {
             $_->{ VaultName } eq $name
         }
-        $glacier->list_vaults
+        $api->list_vaults
         or
-        $glacier->create_vault( $name )
+        $api->create_vault( $name )
         or
         die "Failed create vault: '$name' ($@_)";
 
@@ -34,7 +34,7 @@ SKIP:
     }
     or BAIL_OUT "Error installing test vault: $@";
 
-    if( my $vault_data  = $glacier->describe_vault( $vault ) )
+    if( my $vault_data  = $api->describe_vault( $vault ) )
     {
         # the stable archive test vault does exist 
 
@@ -48,7 +48,7 @@ SKIP:
         my $content = qx{ cat $0 };
 
         my $arch_id 
-        = eval { $glacier->upload_archive( $vault, $content ) };
+        = eval { $api->upload_archive( $vault, $content ) };
 
         my $error   = $@;
 
