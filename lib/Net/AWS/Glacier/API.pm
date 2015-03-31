@@ -364,14 +364,7 @@ my $list_jobs
     $request    .= '?' . join '&' => @argz
     if @argz;
 
-    my $decoded = $api->$acquire_content( GET => $request );
-
-    my $new     = $decoded->{ Marker    };
-    my $jobz    = $decoded->{ JobList   };
-
-    wantarray
-    ? @$jobz
-    :  $jobz
+    $api->$acquire_content( GET => $request )
 };
 
 ########################################################################
@@ -887,6 +880,8 @@ sub get_job_output
 
 sub list_jobs
 {
+$DB::single = 1;
+
     state $limit_d  = 50;
     state $marker   = '';
 
@@ -896,11 +891,11 @@ sub list_jobs
     if( defined $name )
     {
         $name
-        or croak "Bogus iterate_list_jobs: false vault name";
+        or croak "Bogus list_jobs: false vault name";
     }
     elsif( @_ )
     {
-        croak "Bogus iterate_list_jobs: undefined vault name";
+        croak "Bogus list_jobs: undefined vault name";
     }
     else
     {
@@ -910,10 +905,7 @@ sub list_jobs
         return
     }
 
-    my $comp    = shift // '';
-    my $limit   = shift // $limit_d;
-    my $status  = shift // '';
-    my $onepass = shift // '';
+    my ( $comp, $limit, $status, $onepass ) = @_;
 
     if( $onepass )
     {
@@ -921,12 +913,13 @@ sub list_jobs
         $marker = '';
     }
 
-    # NB: limit default && validation is dealt with 
+    # limit default && validation is dealt with 
     # inside the api call.
 
     my $decoded 
     = $api->$list_jobs
     (
+        $name,
         $comp,
         $limit,
         $status,
@@ -937,6 +930,26 @@ sub list_jobs
     my $jobz    = $decoded->{ JobList   };
 
     ( !! $marker, $jobz )
+}
+
+sub list_all_jobs
+{
+    my $api     = shift;
+    my @jobz    = ();
+
+    $api->list_jobs( undef );
+
+    for(;;)
+    {
+        my ( $continue, $chunk ) = $api->list_jobs( @_ );
+
+        push @jobz, @$chunk;
+        $continue or last;
+    }
+
+    wantarray
+    ?  @jobz
+    : \@jobz
 }
 
 # keep require happy
@@ -1173,49 +1186,62 @@ This takes a vault name and deletes all notification events.
 
 =over 4
 
-=item list_jobs iterate_list_jobs describe_job
+=item list_jobs
 
-list_jobs takes a vault name and returns all of the jobs available
-in one pass. This is equivalent to the loop shown below with
-$only_complete and $onepass as false and a push of @$job_list.
-
-iterate_list_jobs is I<not> part of the the AWS Glacier 
-specification but seems basic enough to include here. This 
-helps automate the cycle of querying jobs. It takes a 
-vault name, and optional parameters for filtering the list 
-and returns a boolean and the current chunk of jobs. If 
-the boolean is true then the next call will return anohter 
-chunk of the current job list.
-
-Optional parameters include the maximum number of jobs to list (50),
-whether to only list completed jobs (true), and whether to run only
-one pass. 
-
-Passing true for onepass forces the list limit to one job and will 
-always return false for continue. Its use is in quickly determining
-if any jobs are avilable at all.
+list_jobs does I<not> exactly match the AWS Glacier 
+specification. The difference is in returning a boolean to indicate
+that more jobs are available vs. a marker string. The marker is 
+managed by list_jobs. This leaves the call looking like:
 
     my @jobz    = ();
 
     for(;;)
     {
-        my ( $continue, $job_list ) = $api->iterate_list_jobs
-        (
-            $vault_name,
-            $list_limit,    # default 50
-            '',             # default 'true'
-            '',             # default false, see below
+        my ( $continue, $chunk ) 
+        = $api->list_jobs
+        ( 
+            $name,
+            $comp,      # show only completed jobs
+            $limit,     # chunk limit, default 50
+            $status,    # Successful/Failed
+            $onepass    # set limit to 1, ignore marker
         );
 
-        # or process the jobs in chunks ...
-
-        push @jobz, @$job_list;
-
+        push @jobz, @$chunk;
         $continue or last;
     }
 
-    # at this point @jobz is all of the 
+Both $comp and $status defult to ignore (i.e., no filtering).
+$onepass is used for boolean lookups like "has_completed_jobs" that
+only need a single job returned and will not loop.
 
+If the list_jobs cycle is aborted (i.e., list_jobs is not called
+after returns returning true for $continue, above) then the marker
+can be re-set with an explicit undef for the vault name:
+
+    $api->list_jobs( undef );
+
+=item list_all_jobs 
+
+This simply calls list_jobs with an undef to reset the marker and with
+its input arguments until continue returns false.
+
+In most cases this will be more useful, replacing the loops above with
+a single line:
+
+    my @found   = $api->list_all_jobs( $name, $comp, ... );
+    my $found   = $api->list_all_jobs( $name, $comp, ... );
+
+See list_jobs, above, for arguments.
+
+=item describe_job
+
+This takes a single job_id (e.g., as returned by list_jobs, above) and
+returns the complete job status structure:
+
+    my $struct  = $api->describe_job( $job_id );
+
+See below for full structure and details of the fields.
 
 =head3 Job status structure.
 
@@ -1268,8 +1294,6 @@ perly true/false value rather than boolean object.
 "ArchiveSHA256TreeHash" is used to validate multi-part download 
 results. See Example "Download it in chunks" for how to use this
 field.
-
-=back
 
 =back 
 
