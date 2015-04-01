@@ -18,7 +18,7 @@ SKIP:
     my $vault   = "test-glacier-archives";
 
     my $vault_data  = $api->describe_vault( $vault ) 
-    or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
+    or BAIL_OUT "Vault '$vault' does not exist, run prior tests";
 
     note 'Vault data:', explain $vault_data;
 
@@ -36,9 +36,9 @@ SKIP:
     {
         grep
         {
-            $_->{ Action } eq 'InventoryRetrieval'
+            'InventoryRetrieval' eq $_->{ Action }
         }
-        $api->list_jobs( $vault )
+        $api->list_all_jobs( $vault )
     }
     or do
     {
@@ -46,6 +46,8 @@ SKIP:
 
         skip "No jobs found ($@)", 1
     };
+
+    note "Inventory jobs:\n", explain \@jobz;
 
     my @compz
     = grep
@@ -65,6 +67,8 @@ SKIP:
         my $output  
         = eval 
         {
+            note "Retrieve: '$job_id'";
+
             my $json = $api->get_job_output( $vault, $job_id );
             pass 'Job has output';
 
