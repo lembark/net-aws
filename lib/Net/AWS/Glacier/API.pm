@@ -880,8 +880,6 @@ sub get_job_output
 
 sub list_jobs
 {
-$DB::single = 1;
-
     state $limit_d  = 50;
     state $marker   = '';
 
