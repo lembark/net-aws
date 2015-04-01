@@ -1,3 +1,5 @@
+etc/test.conf
+t/00-*
 /blib/
 /.build/
 _build/
@@ -21,8 +23,6 @@ nytprof.out
 *~
 ?
 !t
-t/00-*
-test.conf
 tmp
 *.out
 foo
