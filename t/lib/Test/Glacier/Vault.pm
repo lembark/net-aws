@@ -1,7 +1,7 @@
 ########################################################################
 # housekeeping
 ########################################################################
-package Test::GlacierUtil;
+package Test::Glacier::Vault;
 use v5.20;
 use autodie;
 use FindBin::libs;
@@ -15,7 +15,7 @@ use Symbol      qw( qualify_to_ref );
 # package variables
 ########################################################################
 
-state $madness  = 'Net::AWS::Glacier';
+my $madness = 'Net::AWS::Glacier::Vault';
 
 ########################################################################
 # utility subs
@@ -28,9 +28,9 @@ sub import
     my  @credz 
     = eval
     {
-        require Test::GlacierAPI;
+        require Test::Glacier::API;
 
-        Test::GlacierAPI->read_creds
+        Test::Glacier::API->read_creds
     }
     or BAIL_OUT "Unable to read credentials ($@)";
 
@@ -40,7 +40,7 @@ sub import
 
     note "Install: Util object -> $caller";
 
-    *{ qualify_to_ref glacier => $caller } 
+    *{ qualify_to_ref vault => $caller } 
     = \( $madness->new( @credz ) );
 
     return

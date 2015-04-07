@@ -1,7 +1,7 @@
 ########################################################################
 # housekeeping
 ########################################################################
-package Test::GlacierAPI;
+package Test::Glacier::API;
 use v5.20;
 use autodie;
 use FindBin::libs;
@@ -99,12 +99,12 @@ sub import
 
     diag "Install: API object -> $caller";
 
-    *{ qualify_to_ref api => $caller } = \( $madness->new( @$credz ) );
+    *{ qualify_to_ref api => $caller } 
+    = \( $madness->new( @$credz ) );
 
     return
 }
 
 # keep require happy
 1
-
 __END__
