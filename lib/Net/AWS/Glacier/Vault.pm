@@ -24,6 +24,7 @@ use Net::AWS::Glacier::API;
 use Net::AWS::Glacier::Vault::Download;
 use Net::AWS::Glacier::Vault::Inventory;
 use Net::AWS::Glacier::Vault::Jobs;
+use Net::AWS::Glacier::Vault::LocalInventory;
 use Net::AWS::Glacier::Vault::Upload;
 
 ########################################################################
