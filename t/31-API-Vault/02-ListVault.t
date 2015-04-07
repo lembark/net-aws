@@ -5,7 +5,7 @@ use FindBin::libs;
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::GlacierAPI;
+use Test::Glacier::API;
 
 SKIP:
 {

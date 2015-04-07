@@ -1,4 +1,3 @@
-
 use v5.20;
 use FindBin::libs;
 
@@ -6,12 +5,12 @@ use Scalar::Util    qw( blessed );
 
 use Test::More;
 
-use_ok 'Test::GlacierAPI';
+use_ok 'Test::Glacier::API';
 
 eval
 q{
     $glacier
-    or BAIL_OUT "glacier not exported by GlacierAPI";
+    or BAIL_OUT "glacier not exported by Glacier::API";
 
     my $expect  = 'Net::AWS::Glacier::API';
     my $found   = blessed $glacier;

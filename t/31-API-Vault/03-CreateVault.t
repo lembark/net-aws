@@ -8,7 +8,7 @@ use Test::More;
 use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
-use Test::GlacierAPI;
+use Test::Glacier::API;
 
 SKIP:
 {

@@ -3,7 +3,7 @@ use autodie;
 use FindBin::libs;
 
 use Test::More;
-use Test::GlacierAPI;
+use Test::Glacier::API;
 
 my @opz
 = qw
