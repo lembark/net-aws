@@ -16,7 +16,7 @@ SKIP:
 
     my $vault   = "test-glacier-archives";
 
-    my $vault_data  = $api->describe_vault( $vault ) 
+    my $vault_data  = $glacier->describe_vault( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
     $vault_data->{ LastInventoryDate } 
@@ -31,7 +31,7 @@ SKIP:
     my $job_id
     = eval
     {
-        $api->initiate_inventory_retrieval( $vault, 'JSON' );
+        $glacier->initiate_inventory_retrieval( $vault, 'JSON' );
 
     }
     or do
@@ -46,7 +46,7 @@ SKIP:
     my @found   
     = eval
     {
-        $api->list_all_jobs( $vault )
+        $glacier->list_all_jobs( $vault )
     }
     or do
     {

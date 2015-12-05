@@ -19,7 +19,7 @@ SKIP:
     my $method  = 'create_vault';
     my @argz    = qw( test-glacier-module );
 
-    my $found   = eval { $api->$method( @argz ) };
+    my $found   = eval { $glacier->$method( @argz ) };
 
     ok ! $@,    "No errors ($@)";
     ok $found,  "$method returns";
@@ -47,7 +47,7 @@ SKIP:
         }
     }
 
-    my @vaultz  = $api->list_vaults;
+    my @vaultz  = $glacier->list_vaults;
 
     note 'Exisiting vaults:', explain @vaultz;
 

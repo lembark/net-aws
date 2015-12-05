@@ -14,7 +14,7 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    for( $api->list_vaults )
+    for( $glacier->list_vaults )
     {
         state $test_rx = qr{^ test- .+ -\d+ $}x;
 
@@ -27,7 +27,7 @@ SKIP:
 
         eval
         {
-            $api->delete_vault( $name ); 
+            $glacier->delete_vault( $name ); 
 
             pass $message;
         }

@@ -20,7 +20,7 @@ SKIP:
         my $time    = time;
         my $name    = "test-glacier-$$-$time";
 
-        $api->create_vault( $name )
+        $glacier->create_vault( $name )
         or BAIL_OUT "Failed create vault: '$name' ($@_)";
 
         $name
@@ -30,7 +30,7 @@ SKIP:
     my $desc
     = eval
     {
-        $api->describe_vault( $vault )
+        $glacier->describe_vault( $vault )
     }
     or do
     {
@@ -45,7 +45,7 @@ SKIP:
         # this will normally fail due to the lack of an 
         # existing inventory for the vault.
 
-        $api->initiate_inventory_retrieval( $vault, 'JSON' )
+        $glacier->initiate_inventory_retrieval( $vault, 'JSON' )
     };
 
     note 'Expected error:', $@;
@@ -75,7 +75,7 @@ SKIP:
 
     eval
     {
-        $api->delete_vault( $vault )
+        $glacier->delete_vault( $vault )
         and
         pass "Vault deleted: '$vault'"
     }

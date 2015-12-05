@@ -20,7 +20,7 @@ my @opz
 
 for my $method ( @opz )
 {
-    can_ok $api, $method;
+    can_ok $glacier, $method;
 }
 
 done_testing;

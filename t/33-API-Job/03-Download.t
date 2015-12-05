@@ -17,7 +17,7 @@ SKIP:
 
     my $vault   = "test-glacier-archives";
 
-    my $vault_data  = $api->describe_vault( $vault ) 
+    my $vault_data  = $glacier->describe_vault( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run prior tests";
 
     note 'Vault data:', explain $vault_data;
@@ -38,7 +38,7 @@ SKIP:
         {
             'InventoryRetrieval' eq $_->{ Action }
         }
-        $api->list_all_jobs( $vault )
+        $glacier->list_all_jobs( $vault )
     }
     or do
     {
@@ -69,7 +69,7 @@ SKIP:
         {
             note "Retrieve: '$job_id'";
 
-            my $json = $api->get_job_output( $vault, $job_id );
+            my $json = $glacier->get_job_output( $vault, $job_id );
             pass 'Job has output';
 
             my $struct  = decode_json $json;

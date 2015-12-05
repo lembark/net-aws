@@ -14,7 +14,7 @@ SKIP:
      
     my $method  = 'list_vaults';
 
-    my @found   = eval { $api->$method };
+    my @found   = eval { $glacier->$method };
     my $error   = $@;
 
     note "Error: $@" if $@;
