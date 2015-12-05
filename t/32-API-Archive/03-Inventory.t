@@ -37,7 +37,6 @@ SKIP:
     if( my $vault_data  = $api->describe_vault( $vault ) )
     {
         my $date = $vault_data->{ LastInventoryDate } 
-        or skip 
         or do
         {
             diag "Vault '$vault' lacks inventory\n",

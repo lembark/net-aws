@@ -100,7 +100,9 @@ sub write_inventory
     my $dest    = shift // $dest_d;
 
     my $statz   = $vault->call_api( describe_job => $job_id );
-    my $desc    = $statz->{ Description }
+    my $desc    = $statz->{ JobDescription };
+
+
 }
 
 sub process_jobs
@@ -115,7 +117,7 @@ sub process_jobs
         my ( $continue, $jobz )
         = $vault->call_api
         (
-            iterate_list_jobs =>
+            list_all_jobs =>
             $comp_only
         );
 

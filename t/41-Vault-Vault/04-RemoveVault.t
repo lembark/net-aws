@@ -6,7 +6,7 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::GlacierAPI;
+use Test::Glacier::API;
 
 my $method  = 'delete_vault';
 my @argz    = qw( test-glacier-module );

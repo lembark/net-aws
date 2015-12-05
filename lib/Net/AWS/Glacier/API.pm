@@ -159,7 +159,7 @@ my $send_request
         }
         || $res->message;
 
-        croak "Failed request: $status, $message"
+        croak "Failed request: $status, $message\n"
     };
 
     $res
@@ -804,10 +804,11 @@ sub initiate_inventory_retrieval
 {
     state $empty    = [];
     state $valid    = [ qw( JSON XML ) ];
+    state $format_d = 'JSON';
 
     my $api     = shift;
     my $name    = shift or croak "false vault name";
-    my $format  = shift or croak "false return data format ($name)";
+    my $format  = shift || $format_d;
     my $desc    = $sanitize_description->( @_, 'Inventory ' . $name );
     my $topic   = shift // '';
 

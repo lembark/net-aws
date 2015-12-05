@@ -17,7 +17,8 @@ SKIP:
     my $vault
     = eval
     {
-        my $name    = "test-glacier-$$";
+        my $time    = time;
+        my $name    = "test-glacier-$$-$time";
 
         $api->create_vault( $name )
         or BAIL_OUT "Failed create vault: '$name' ($@_)";
@@ -41,22 +42,35 @@ SKIP:
     my $job_id
     = eval
     {
-        # this will fail due to the lack of an existing inventory
-        # for the vault.
+        # this will normally fail due to the lack of an 
+        # existing inventory for the vault.
 
         $api->initiate_inventory_retrieval( $vault, 'JSON' )
     };
 
-    note 'Error:', $@;
+    note 'Expected error:', $@;
 
-    if( $@ )
+    if
+    (
+        $@
+        &&
+        0 < index $@, 'not yet generated an initial inventory'
+    )
     {
-        ok 0 < index( $@, 'not yet generated an initial inventory' ),
-        'No initial inventory avaiable';
+        pass 'No initial inventory avaiable';
+    }
+    elsif( $@ )
+    {
+        chomp $@;
+        fail "Non-inventory failure: $@";
+    }
+    elsif( $job_id )
+    {
+        pass "Un-expected success: inventory on '$vault' ($job_id)"; 
     }
     else
     {
-        ok $job_id, "Generated job_id: '$job_id' for inventory";
+        fail "Un-managed exception: '$vault' has inventory, no job_id";
     }
 
     eval

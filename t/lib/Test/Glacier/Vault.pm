@@ -30,7 +30,9 @@ sub import
     {
         require Test::Glacier::API;
 
-        Test::Glacier::API->read_creds
+        my $handler = Test::Glacier::API->can( 'read_creds' );
+
+        $handler->()
     }
     or BAIL_OUT "Unable to read credentials ($@)";
 

@@ -25,58 +25,43 @@ my $madness = 'Net::AWS::Glacier::API';
 
 sub read_creds
 {
-    state $credfile_rx = 
+    state $default  = "$etc/test.conf";
+    state $authnz =
     [
-        qr{ ^ Location \W+ }x,
-        qr{ ^ Access \s* Key \s* ID \W+ }x,
-        qr{ ^ Secret \s* Access \s* Key \W+ }x
+        qw
+        (
+            Region
+            AWSAccessKeyId
+            AWSSecretKey
+        )
     ];
 
-    my $config  = "$etc/test.conf";
+    my $config  = shift // $default;
 
-    -e $config  or die "Non-existant: '$config";
-    -s _        or die "Empty file: '$config";
-    -r _        or die "Non-readable: '$config";
+    -e $config  or die "Non-existant: '$config'";
+    -r _        or die "Non-readable: '$config'";
+    -s _        or die "Empty file:   '$config'";
 
-    my @linz
+    my %found
     = do
     {
         open my $fh, '<', $config;
 
-        chomp ( my @l = readline $fh );
-
-        grep { $_ } @l
+        map
+        {
+            chomp;
+            split '='
+        }
+        readline $fh
     };
 
-    @linz
+    my @linz
     = map
     {
-        my $rx  = $_;
-
-        my @found
-        = map
-        {
-            s{ $rx }{}x
-            ? $_
-            : ()
-        }
-        @linz;
-
-        1 == @found
-        or die "Missing/multiple matching lines ($rx)";
-
-        @found
+        $found{ $_ }
+        or die "Bogus $config: false '$_'";
     }
-    @$credfile_rx;
-
-    @linz == @$credfile_rx
-    or do
-    {
-        my $n   = @$credfile_rx;
-        my $m   = @linz;
-
-        die "Botched $config: $m lines ($n expected)";
-    };
+    @$authnz;
 
     wantarray
     ?  @linz
@@ -99,7 +84,7 @@ sub import
 
     diag "Install: API object -> $caller";
 
-    *{ qualify_to_ref api => $caller } 
+    *{ qualify_to_ref glacier => $caller } 
     = \( $madness->new( @$credz ) );
 
     return

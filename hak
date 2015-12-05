@@ -1,0 +1,147 @@
+#!/bin/env perl
+########################################################################
+# housekeeping
+########################################################################
+
+use v5.20;
+use autodie;
+use FindBin::libs;
+
+use File::Basename  qw( basename    );
+use List::Util      qw( first       );
+
+use Getopt::Long    qw( GetOptions  );
+use Pod::Usage      qw( pod2usage   );
+
+use Net::AWS::Glacier;
+
+########################################################################
+# package variables
+########################################################################
+
+my $base        = basename $0;
+my @auth_keyz   = qw( AWSAccessKeyId AWSSecretKey );
+my %argz
+= do
+{
+    my @optz
+    = qw
+    (
+        credential=s
+        verbose!
+    );
+
+    my %cmdline = ();
+
+    if( GetOptions \%cmdline, @optz )
+    {
+        if( $cmdline{ help } )
+        {
+            pod2usage
+            -message    => 'Usage:',
+            -exitval    => 1,
+            -verbose    => $cmdline{ verbose } || 0
+        }
+    }
+    else
+    {
+        pod2usage 
+        -message    => "$@",
+        -exitval    => -1
+    }
+
+    %cmdline
+};
+
+my $verbose = delete $argz{ verbose };
+
+if
+(
+    my $path
+    = first
+    {
+        $_ 
+    }
+    (
+        $argz{ credential },
+        $ENV{ AWS_CREDENTIAL_FILE },
+        "$ENV{ HOME }/.aws/credential"
+    )
+)
+{
+    say "Credentials from: '$path'";
+
+    -e $path    or die "Bogus $base: non-existant '$path'\n";
+    -r _        or die "Bogus $base: un-readable  '$path'\n";
+    -s _        or die "Bogus $base: empty        '$path'\n";
+
+    open my $fh, '<', $path;
+
+    my %authnz
+    = map
+    {
+        chomp;
+        split '=' => $_, 2
+    }
+    readline $fh;
+
+    for my $key ( qw( AWSAccessKeyId AWSSecretKey ) )
+    {
+        $authnz{ $key }
+        or die "Bogus credential: '$path' lacks '$key' value"; 
+    }
+
+    @argz{ keys %authnz } = values %authnz;
+}
+else
+{
+    die "Bogus $0: missing --config and AWS_CREDENTIAL_FILE\n";
+}
+
+my $name    = shift
+or die "Bogus base: false vault name";
+
+my $vault
+= Net::AWS::Glacier::Vault->new 
+(
+    $name       =>
+    key         => $argz{ AWSAccessKeyId    },
+    secret      => $argz{ AWSSecretKey      },
+    region      => $argz{ Region            },
+);
+
+my $job_id
+= do
+{
+    if( my $job = $vault->has_pending_inventory )
+    {
+        $job->{ JobId }
+    }
+    else
+    {
+        $vault->initiate_inventory
+    }
+};
+
+say "Pending inventory: '$job_id' ($name)";
+
+say 
+map
+{
+    local $Data::Dumper::Terse      = 1;
+    local $Data::Dumper::Indent     = 1;
+    local $Data::Dumper::Sortkeys   = 1;
+
+    local $Data::Dumper::Purity     = 0;
+    local $Data::Dumper::Deepcopy   = 0;
+    local $Data::Dumper::Quotekeys  = 0;
+
+    ref $_ ? Dumper $_ : $_
+}
+(
+    "Available jobs: '$name'" => $vault->list_jobs
+);
+
+# this is not a module
+0
+__END__

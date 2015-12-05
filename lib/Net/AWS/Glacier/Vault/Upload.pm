@@ -7,6 +7,8 @@ use autodie;
 
 use File::Spec::Functions;
 
+use File::Basename  qw( basename );
+
 use Carp    qw( carp croak  );
 use Fcntl   qw( O_RDONLY    );
 
@@ -131,7 +133,7 @@ sub calculate_multipart_upload_partsize
 
 sub upload_multipart
 {
-    state $chunk_d  = 128 * MiB;
+    state $chunk_d  = 64 * MiB;
     state $buffer   = '';
 
     my $vault   = shift;
@@ -157,39 +159,91 @@ sub upload_multipart
             croak "file is neither a GLOB nor existing path: '$file'"
         }
     };
+
+    # somewhere over the rainbow...
+
+    ...
 }
 
 sub upload_singlepart
 {
     my $vault   = shift;
-    my $file    = shift or croak "false file ($vault)";
-    my $desc    = shift or croak "false description ($vault)";
+    my $name    = $$vault   or croak "false vault name";
+    my $file    = shift     or croak "false file ($vault)";
+    my $desc    = shift     or croak "false description ($vault)";
 
-   
+    my $fh
+    = do
+    {
+        if( ref $file )
+        {
+            $file
+        }
+        elsif( -e $file )
+        {
+            -r _        or die  "Non-readable: '$file'\n";
+            -s _        or warn "Zero-sized:   '$file'\n";
+
+            sysopen my $fh, $file, 'O_RDONLY';
+
+            $fh
+        }
+        else
+        {
+            croak "File is neither a GLOB nor existing path: '$file'"
+        }
+    };
+
+    say "Upload: '$desc' ($name)";
+
+    $vault->call_api( upload_archive => $fh, $desc );
 }
 
 sub upload_paths
 {
     my $vault = shift;
-
     @_  or return;
+
+    my $name    = $$vault
+    or croak "Bogus upload_paths: vault lacks name";
 
     my %path2arch   = ();
 
     for( @_ )
     {
         my ( $path, $desc )
-        = (ref)
+        = ( ref )
         ? @$_
-        : $_
-        ;
-
-        $path2arch{ $path } 
-        = eval
+        : do
         {
-            $vault->call_api( upload_archive => $path, $desc )
+            my $base    = join '-', split /\s+/, basename $_;
+
+            ( $_ => $base )
+        };
+
+        eval
+        {
+            open my $fh, '<', $path;
+
+            say "Upload: '$path' as '$desc' ($name)";
+
+# check -s here to decide on single- or multi-part uploads.
+
+            $path2arch{ $path } 
+            = $vault->upload_singlepart( $fh, $desc );
+
+# find the max upload rate and avoid overrunning
+# it here.
+
+            sleep 10 if @_ > 10;
         }
-        or carp "'$path', $@"; 
+        or do
+        {
+            warn "Failed upload: $@";
+            warn "Aborting upload at: '$path' ($name)";
+
+            last
+        };
     }
 
     wantarray   // return;

@@ -5,16 +5,13 @@
 package Net::AWS::Glacier::Vault::Inventory;
 use v5.20;
 
-########################################################################
-# package varaibles
-########################################################################
-
-our $VERSION    = '0.01';
-eval $VERSION;
+use Carp        qw( croak   );
+use List::Util  qw( first   );
 
 use Exporter::Proxy
 qw
 (
+    initiate_inventory
     last_inventory
     has_current_inventory
     has_pending_inventory
@@ -22,15 +19,58 @@ qw
 );
 
 ########################################################################
+# package varaibles
+########################################################################
+
+our $VERSION    = '0.01';
+eval $VERSION;
+
+########################################################################
 # methods
 ########################################################################
 
-sub last_inventory
+sub initiate_inventory
 {
-    state $api_op   = 'describe_vault';
-    state $inv_key  = 'LastInventoryDate'; 
+    state $api_op   = 'initiate_inventory_retrieval';
+    state $format   = 'JSON';
+    state $snooze   = 3600;
+    state $cycles_d = 25;
 
     my $vault       = shift;
+    my $cycles      = shift // $cycles_d;
+    my $job_id      = '';
+
+    for( my $i = $cycles ; --$i ; sleep $snooze )
+    {
+        $job_id
+        = eval
+        {
+            $vault->call_api( $api_op => $format, @_ )
+        }
+        and last;
+
+        0 < index $@, q{cannot be initiated yet}
+        or die;
+
+        my $i   = index $@, 'at /';
+
+        print substr $@, 0, $i;
+    }
+
+    $job_id
+}
+
+sub last_inventory
+{
+    # caller gets back job_id of inventory.
+
+    state $api_op   = 'describe_vault';
+    state $inv_key  = 'LastInventoryDate';
+
+    my $vault       = shift;
+
+    $$vault
+    or croak 'Bogus initiate_inventory: false name';
 
     $vault->call_api( $api_op )->{ $inv_key }
 }
@@ -43,17 +83,17 @@ sub has_current_inventory
     {
         my $job = shift;
 
-        $job->{ Action            } eq 'Inventory'
+        $job->{ Action            } eq 'InventoryRetrieval'
         and
-        $job->{ CompletionDate    } gt $inv_date
+        $job->{ CompletionDate    } ge $inv_date
     };
 
     my $vault   = shift;
     $inv_date   = $vault->last_inventory;
 
-    my @found       
+    my @found
     = $vault->filter_jobs
-    ( 
+    (
         filter      => $filter,
         completed   => 1,
         statuscode  => 'Succeeded',
@@ -76,9 +116,9 @@ sub has_pending_inventory
 
     my $vault   = shift;
 
-    my @found       
+    my @found
     = $vault->filter_jobs
-    ( 
+    (
         filter      => $filter,
         completed   => 0,
     )
@@ -91,50 +131,53 @@ sub download_current_inventory
 {
     my $dest_d  = './';
     my $time_d  = 3600 * 6;         # jobs can take up to 5 hours.
+    my $snooze  = 1800;
 
     my $vault   = shift;
-    my $dest    = shift;
+    my $name    = $$vault
+    or croak "Bogus download_current_inventory: false vault name";
+
+    my $dest    = shift // $dest_d;
     my $timeout = shift // $time_d;
 
-    my $job_id  = '';
     my $path    = '';
 
     my $cutoff  = time + $timeout;
 
-    $job_id
-    = do
+    for(;;)
     {
         if( my $job = $vault->has_current_inventory )
         {
-            $job->{ JobId }
+            my $job_id  = $job->{ JobId };
+
+            $path       =  $vault->write_inventory( $job_id, $dest );
+
+            last
         }
         elsif( $job = $vault->has_pending_inventory )
         {
-            $job->{ JobId }
+            my $job_id  = $job->{ JobId };
+
+            if( time > $cutoff )
+            {
+                die "Cutoff time exceeded: '$job_id' ($$vault)\n";
+            }
+            else
+            {
+                say "Waiting for '$job_id' ($name)";
+                sleep $snooze;
+            }
         }
         else
         {
+            # initiate a new request, test above this one
+            # short circuits this call.
+
             $vault->call_api( 'initiate_inventory_retrieval' )
         }
-    };
-
-    for(;;)
-    {
-        if( $vault->job_completed( $job_id ) )
-        {
-            $path   = $vault->write_inventory( $job_id, $dest )
-            and last;
-        }
-        elsif( time > $cutoff )
-        {
-            die "Cutoff time exceeded: '$job_id'";
-        }
-        else
-        {
-            say "Waiting for '$job_id'";
-            sleep 1800;
-        }
     }
+
+    # caller gets back write path (or an exception due to timeout).
 
     $path
 }

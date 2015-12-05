@@ -6,15 +6,16 @@ package Net::AWS::Glacier::Vault;
 use v5.20;
 use autodie;
 use overload 
-    q{"}    => sub { my $vault = shift; $$vault     },
+    q{""}   => sub { my $vault = shift; $$vault     },
     q{bool} => sub { my $vault = shift; !! $$vault  },
 ;
 
 use Carp;
 use NEXT;
 
-use Scalar::Util    qw( blessed refaddr         );
-use Symbol          qw( qualify_to_ref          );
+use List::Util      qw( first           );
+use Scalar::Util    qw( blessed refaddr );
+use Symbol          qw( qualify_to_ref  );
 
 use Net::AWS::Const;
 use Net::AWS::Glacier::API;
@@ -58,17 +59,50 @@ while( my ($i, $name ) = each @arg_fieldz )
     *{ qualify_to_ref $name }
     = sub
     {
-        my $vault   = shift;
+        my ( $vault, $value ) = @_;
         my $argz    = $vault_argz{ refaddr $vault }
         or croak "Bogus $name: uninitialized object '$vault'";
 
-        @_
-        ? ( $argz->[ $i ] = shift )
+        @_ > 1
+        ? ( $argz->[ $i ] = $value )
         :   $argz->[ $i ]
     };
 }
 
-# The names look like:
+sub exists
+{
+    my $vault   = shift;
+    my $name    = $$vault;
+
+    first 
+    {
+        $name eq $_->{ VaultName }
+    }
+    $vault->call_api( 'list_vaults' )
+}
+
+sub create
+{
+    my $vault   = shift;
+    my $name    = $$vault;
+
+    $vault->exists
+    or 
+    $vault->call_api( create_vault => $name )
+}
+
+sub delete
+{
+    my $vault   = shift;
+    my $name    = $$vault;
+
+    $vault->exists
+    or die "Bogus delete: non-existant vault '$name'";
+
+    $vault->call_api( 'delete_vault' )
+}
+
+# Generated method names look like:
 #
 # {has|list}_{pending|completed}_{download|inventory}_jobs.
 #
@@ -129,7 +163,7 @@ for
                 local @CARP_NOT = ( __PACKAGE__ );
 
                 my $vault   = shift;
-                my @found   = $vault->call_api( filter_jobs => @argz );
+                my @found   = $vault->filter_jobs( @argz );
 
                 $onepass 
                 and return !! @found;
@@ -186,7 +220,7 @@ sub construct
     $vault_argz{ refaddr $vault } 
     = $class
     ? $vault_argz{ refaddr $proto }
-    : {}
+    : []
     ;
 
     $vault
@@ -194,15 +228,14 @@ sub construct
 
 sub initialize
 {
-    my $vault   = shift;
-    $$vault     = shift;
-    
     # note that the name might be false for a factory object.
 
-    if( @_ )
-    {
-        my %initz   = @_;
+    my ( $vault, $name, %initz ) = @_;
 
+    $$vault     = $name;
+
+    if( @_ > 1 )
+    {
         for( @arg_fieldz )
         {
             my $value   = $initz{ $_ } // next;
@@ -218,7 +251,7 @@ sub new
 {
     my $vault   = &construct;
 
-    $vault->EVERY::LAST::intialize( @_ );
+    $vault->EVERY::LAST::initialize( @_ );
 
     # after this point the vault is immutable.
     # not so its inside-out data, but accessing a new vault

@@ -42,30 +42,22 @@ sub verbose
 sub list_jobs
 {
     my $vault   = shift;
-    my @jobz    = ();
 
     my @passthru
     = do
     {
-        state $api_argz = [ qw( complete limit statuscode onepass ) ];
+        state $api_argz = [ qw( completed limit statuscode onepass ) ];
 
         my %argz    = @_;
 
-        ( $vault => @argz{ @$api_argz } )
+        ( @argz{ @$api_argz } )
     };
 
-    for(;;)
-    {
-        my ( $continue, $jobz ) 
-        = $vault->call_api
-        (
-            iterate_list_jobs => @passthru
-        );
-
-        push @jobz, @$jobz;
-
-        $continue or last;
-    }
+    my @jobz
+    = $vault->call_api
+    (
+        list_all_jobs => @passthru
+    );
 
     wantarray
     ?  @jobz
@@ -86,9 +78,8 @@ sub filter_jobs
 sub job_status
 {
     my $vault   = shift;
-
     my $job_id  = shift
-    or croak "false job_id";
+    or croak "Bogus job_status: false job_id";
 
     my $statz   = $vault->call_api( describe_job => $job_id )
     or return;

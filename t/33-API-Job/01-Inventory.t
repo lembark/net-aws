@@ -41,7 +41,7 @@ SKIP:
         skip 'No inventory job to analyze', 1
     };
 
-    pass 'initiate_inventory_retrieval';
+    pass "initiate_inventory_retrieval '$job_id' ($vault)";
 
     my @found   
     = eval
@@ -55,13 +55,20 @@ SKIP:
         skip 'No job list analyze', 1
     };
 
-    my $job_statz
-    = first
+    if
+    (
+        my $job_statz
+        = first
+        {
+            $job_id eq $_->{ JobId }
+        }
+        @found
+    )
     {
-        $job_id eq $_->{ JobId }
+        note "Job description: '$job_id' ($vault)\n", $job_statz;
+        pass "Inventory job: '$job_id'";
     }
-    @found
-    or do
+    else
     {
         diag "Job list lacks job: '$job_id'\n", explain \@found;
 
