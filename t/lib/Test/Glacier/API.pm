@@ -9,7 +9,8 @@ use FindBin::libs   qw( base=etc export scalar );
 
 use Test::More;
 
-use Symbol      qw( qualify_to_ref );
+use Symbol      qw( qualify_to_ref  );
+use YAML::XS    qw( Load            );
 
 use Net::AWS::Glacier::Signature;
 
@@ -25,43 +26,42 @@ my $madness = 'Net::AWS::Glacier::API';
 
 sub read_creds
 {
-    state $default  = "$etc/test.conf";
-    state $authnz =
+    state $cred_fieldz = 
     [
-        qw
-        (
-            Region
-            AWSAccessKeyId
-            AWSSecretKey
-        )
+        'Location',
+        'Access Key ID',
+        'Secret Access Key'
     ];
 
-    my $config  = shift // $default;
+    my $config  = "$etc/test.conf";
 
-    -e $config  or die "Non-existant: '$config'";
-    -r _        or die "Non-readable: '$config'";
-    -s _        or die "Empty file:   '$config'";
+    -e $config  or die "Non-existant: '$config";
+    -s _        or die "Empty file: '$config";
+    -r _        or die "Non-readable: '$config";
 
-    my %found
-    = do
+    my $credz
+    = eval
     {
         open my $fh, '<', $config;
 
-        map
-        {
-            chomp;
-            split '='
-        }
-        readline $fh
-    };
+        local $/;
+
+        my $yaml    = readline $fh;
+
+        Load $yaml
+    }
+    or die "Failed read: '$config', $@";
+
+    my $id  = $credz->{ Glacier }
+    or die "Bogus $config: Missing 'Glacier'";
 
     my @linz
     = map
     {
-        $found{ $_ }
-        or die "Bogus $config: false '$_'";
+        $id->{ $_ }
+        or die "Missing: '$_'"
     }
-    @$authnz;
+    @$cred_fieldz;
 
     wantarray
     ?  @linz

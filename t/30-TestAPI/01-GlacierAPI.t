@@ -5,10 +5,10 @@ use Scalar::Util    qw( blessed );
 
 use Test::More;
 
-use_ok 'Test::Glacier::API';
+use Test::Glacier::API;
 
 eval
-q{
+{
     $glacier
     or BAIL_OUT "glacier not exported by Glacier::API";
 
@@ -19,6 +19,9 @@ q{
     or BAIL_OUT "Mismatched class: '$found' ($expect)";
 
     pass "Glacier is $expect";
-};
+
+    1
+}
+or BAIL_OUT "Failed use API: $@";
 
 done_testing;
