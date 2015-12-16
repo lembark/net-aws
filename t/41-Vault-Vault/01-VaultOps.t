@@ -42,7 +42,15 @@ my @opz
 
 for my $method ( @opz )
 {
-    can_ok $vault, $method;
+    can_ok $proto, $method;
+}
+
+for my $name ( qw( frobnicate ) )
+{
+
+    my $vault   = $proto->new( $name );
+
+    is "$vault", $name, "Vault is: '$vault' ($name)";
 }
 
 done_testing;

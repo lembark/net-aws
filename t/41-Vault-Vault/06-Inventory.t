@@ -7,68 +7,86 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::Glacier::API;
+use Test::Glacier::Vault;
 
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault
-    = eval
+    for my $vault ( $proto->new( "test-glacier-$$" ) )
     {
-        my $name    = "test-glacier-$$";
+        eval
+        {
+            $vault->create;
 
-        $glacier->create_vault( $name )
-        or BAIL_OUT "Failed create vault: '$name' ($@_)";
+            if( $vault->exists )
+            {
+                pass "Vault '$vault' exists";
 
-        $name
-    }
-    or BAIL_OUT "Error installing test vault: $@";
+                if( my $last  = $vault->last_inventory )
+                {
+                    fail "Inventory exists for '$vault'";
+                }
+                else
+                {
+                    pass "No inventory for '$vault'";
+                }
+            }
+            else
+            {
+                fail "Vault '$vault' does not exist";
+            }
 
-    my $desc
-    = eval
-    {
-        $glacier->describe_vault( $vault )
-    }
-    or do
-    {
-        fail "Failed describe_vault: '$vault' ($@)";
-    };
+            $vault->delete;
 
-    note 'Vault description:', explain $desc;
-
-    my $job_id
-    = eval
-    {
-        # this will fail due to the lack of an existing inventory
-        # for the vault.
-
-        $glacier->initiate_inventory_retrieval( $vault, 'JSON' )
-    };
-
-$DB::single = 1;
-
-    note 'Error:', $@;
-
-    if( $@ )
-    {
-        ok 0 < index( $@, 'not yet generated an initial inventory' ),
-        'No initial inventory avaiable';
-    }
-    else
-    {
-        ok $job_id, "Generated job_id: '$job_id' for inventory";
+            1
+        }
+        or fail "$vault: $@";
     }
 
-    eval
+    for my $vault ( $proto->new( "test-glacier-archives" ) )
     {
-        $glacier->delete_vault( $vault )
-        and
-        pass "Vault deleted: '$vault'"
-    }
-    or diag "Failed delete vault: '$vault' ($@)";
+        eval
+        {
+            if( $vault->exists )
+            {
+                pass "Vault '$vault' exists";
 
+                if( my $last  = $vault->last_inventory )
+                {
+                    pass "Inventory exists for '$vault'";
+
+                    my $path
+                    = $vault->download_current_inventory
+                    (
+                        './tmp'
+                    );
+
+                    if( -e $path )
+                    {
+                        -s _    or die "Zero-sized: '$vault' ($path)";
+                        -r _    or die "Unreadable: '$vault' ($path)";
+                    }
+                    else
+                    {
+                        fail "No download: '$vault' ($path)";
+                    }
+                }
+                else
+                {
+                    fail "No inventory for '$vault'";
+                }
+            }
+            else
+            {
+                fail "Vault '$vault' does not exist";
+            }
+
+            1
+        }
+        or fail "$vault: $@";
+    }
 };
 
 done_testing;

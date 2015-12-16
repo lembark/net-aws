@@ -7,32 +7,39 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::Glacier::API;
+use Test::Glacier::Vault;
 
-for( $glacier->list_vaults ) 
+for( $proto->list_all ) 
 {
-    my $name    = $_->{ VaultName };
-    my $found   = eval { $glacier->describe_vault( $name ) };
-
-    note 'Describe vault returns:', explain $found;
-
-    ok ! $@,    "Errors: '$@'";
-
-    SKIP:
+    for my $name (  $_->{ VaultName } )
     {
-        $found  or skip "Nothing found for $name", 1;
+        note "Describe: '$name'";
 
-        ok exists $found->{ $_ }, "Describe $name contains: '$_'"
-        for
-        qw
-        (
-            CreationDate
-            LastInventoryDate
-            NumberOfArchives
-            SizeInBytes
-            VaultARN
-            VaultName
-        );
+        eval
+        {
+            my $vault   = $proto->new( $name );
+            my $found   = $vault->describe;
+
+            $found  or die "False describe: '$vault'";
+            %$found or die "Empty describe: '$vault'";
+
+            note "Describe: '$vault'\n", explain $found;
+
+            ok exists $found->{ $_ }, "$name contains: '$_'"
+            for
+            qw
+            (
+                CreationDate
+                LastInventoryDate
+                NumberOfArchives
+                SizeInBytes
+                VaultARN
+                VaultName
+            );
+            
+            1
+        }
+        or fail "Describe fails: '$name', $@";
     }
 }
 

@@ -129,57 +129,45 @@ sub has_pending_inventory
 
 sub download_current_inventory
 {
+$DB::single = 1;
+
     my $dest_d  = './';
-    my $time_d  = 3600 * 6;         # jobs can take up to 5 hours.
-    my $snooze  = 1800;
+    my $loop_d  = 12;       # jobs can take 5+ hours.
+    my $snooze  = 1800;     # i.e., 6 hours
 
     my $vault   = shift;
     my $name    = $$vault
     or croak "Bogus download_current_inventory: false vault name";
 
     my $dest    = shift // $dest_d;
-    my $timeout = shift // $time_d;
+    my $count   = shift // $loop_d;
 
-    my $path    = '';
-
-    my $cutoff  = time + $timeout;
-
-    for(;;)
+    my $job
+    = first
     {
-        if( my $job = $vault->has_current_inventory )
+        $_  = $vault->has_current_inventory 
+        or do
         {
-            my $job_id  = $job->{ JobId };
+            $vault->has_pending_inventory 
+            or 
+            $vault->call_api( 'initiate_inventory_retrieval' );
 
-            $path       =  $vault->write_inventory( $job_id, $dest );
+            say "Waiting $snooze sec for inventory ...";
 
-            last
-        }
-        elsif( $job = $vault->has_pending_inventory )
-        {
-            my $job_id  = $job->{ JobId };
+            sleep $snooze;
 
-            if( time > $cutoff )
-            {
-                die "Cutoff time exceeded: '$job_id' ($$vault)\n";
-            }
-            else
-            {
-                say "Waiting for '$job_id' ($name)";
-                sleep $snooze;
-            }
-        }
-        else
-        {
-            # initiate a new request, test above this one
-            # short circuits this call.
-
-            $vault->call_api( 'initiate_inventory_retrieval' )
+            ''
         }
     }
+    ( 1 .. 12 )
+    or
+    die "Cutoff time exceeded: $vault\n";
+
+    my $job_id  = $job->{ JobId };
 
     # caller gets back write path (or an exception due to timeout).
 
-    $path
+    $vault->write_inventory( $job_id, $dest )
 }
 
 # keep require happy

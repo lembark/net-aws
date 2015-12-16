@@ -8,23 +8,98 @@ use JSON::XS        qw( decode_json );
 use Scalar::Util    qw( reftype     );
 
 use Test::More;
-use Test::Glacier::API;
+#use Test::Glacier::API;
+
+use Test::Glacier::Vault;
+
+my $sanity_check
+= sub
+{
+    my $vault   = shift;
+
+    my @jobz    = $vault->list_all_jobs;
+
+    @jobz
+    or do
+    {
+        note "No pending jobs ($vault)\n", explain \@jobz;
+        return
+    };
+
+    @jobz  
+    = grep 
+    {
+        'InventoryRetrieval' eq $_->{ Action }
+    }
+    @jobz
+    or do
+    {
+        note "No inventory jobs\n", explain \@jobz;
+        return
+    };
+
+    @jobz
+    = grep
+    {
+        !! $_->{ Completed }
+    }
+    @jobz
+    or note "No completed jobs\n", explain \@jobz;
+
+    \@jobz
+};
+
+my $completed_inventory_jobs
+= sub
+{
+    my $vault   = shift;
+
+    my @jobz    = $vault->list_all_jobs;
+
+    @jobz
+    or do
+    {
+        note "No pending jobs ($vault)\n", explain \@jobz;
+        return
+    };
+
+    @jobz  
+    = grep 
+    {
+        'InventoryRetrieval' eq $_->{ Action }
+    }
+    @jobz
+    or do
+    {
+        note "No inventory jobs\n", explain \@jobz;
+        return
+    };
+
+    @jobz
+    = grep
+    {
+        !! $_->{ Completed }
+    }
+    @jobz
+    or note "No completed jobs\n", explain \@jobz;
+
+    \@jobz
+};
 
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault   = "test-glacier-archives";
+$DB::single = 1;
 
-    my $vault_data  = $glacier->describe_vault( $vault ) 
+    my $vault_data  = $vault->describe
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
-
-    note 'Vault data:', explain $vault_data;
 
     if( my $date = $vault_data->{ LastInventoryDate }  )
     {
-        pass "LastInventoryDate: '$date'";
+        pass "$vault has 'LastInventoryDate'($date)";
+        note 'Vault data:', explain $vault_data;
     }
     else
     {
@@ -35,31 +110,20 @@ SKIP:
     };
 
     my $jobz
-    = eval
+    = first
     {
-        my @jobz    = $glacier->list_jobs( $vault )
-        or skip "No pending jobs", 1;
+        $_  = $vault->$completed_inventory_jobs
+        or skip "No pending inventory jobs to wait for ($vault)", 1;
 
-        note "Job listing:\n", explain \@jobz;
-
-        @jobz       = grep { !! $_->{ Completed } } @jobz
-        or skip "No completed jobs", 1;
-
-        my @jobz  
-        = grep 
+        @$_
+        ? $_ 
+        : do
         {
-            'InventoryRetrieval' eq $_->{ Action }
+            say 'Waiting for jobs to complete...'; sleep 1800; '' 
         }
-        @jobz
-        or skip "No inventory jobs", 1;
-
-        \@jobz
     }
-    or do
-    {
-        fail "list_jobs: $@";
-        skip "Failed list_jobs available ($@)", 1
-    };
+    ( 1 .. 10 )
+    or skip "Inventory jobs not completing ($vault)", 1;
 
     for( @$jobz )
     {
@@ -68,7 +132,7 @@ SKIP:
         my $output  
         = eval 
         {
-            my $json = $glacier->get_job_output( $vault, $job_id );
+            my $json = $vault->get_job_output( $vault, $job_id );
             pass 'Job has output';
 
             my $struct  = decode_json $json;

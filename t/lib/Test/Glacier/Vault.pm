@@ -4,12 +4,12 @@
 package Test::Glacier::Vault;
 use v5.20;
 use autodie;
-use FindBin::libs;
-use FindBin::libs   qw( base=etc export scalar );
 
 use Test::More;
 
-use Symbol      qw( qualify_to_ref );
+use Symbol          qw( qualify_to_ref  );
+
+use Net::AWS::Util  qw( read_credential );
 
 ########################################################################
 # package variables
@@ -23,27 +23,23 @@ my $madness = 'Net::AWS::Glacier::Vault';
 
 sub import
 {
-    shift;
-
-    my  @credz 
-    = eval
+    state $proto
+    = do
     {
-        require Test::Glacier::API;
+        require_ok $madness;
 
-        my $handler = Test::Glacier::API->can( 'read_creds' );
+        my $keyz = [ qw( region key secret ) ];
+        my %tmp = ();
+        @tmp{ @$keyz }  = read_credential( qw( test Glacier ) );
 
-        $handler->()
-    }
-    or BAIL_OUT "Unable to read credentials ($@)";
-
-    use_ok $madness;
+        $madness->new( '' => %tmp )
+    };
 
     my $caller  = caller;
 
     note "Install: Util object -> $caller";
 
-    *{ qualify_to_ref vault => $caller } 
-    = \( $madness->new( @credz ) );
+    *{ qualify_to_ref proto => $caller } = \$proto;
 
     return
 }

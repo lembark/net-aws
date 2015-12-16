@@ -45,10 +45,9 @@ SKIP:
         @jobz       = grep { !! $_->{ Completed } } @jobz
         or skip "No completed jobs", 1;
 
-        my $n       = @jobz;
-        note "Completed jobs: $n";
+        note 'Completed jobs: ' . scalar @jobz;
 
-        my @jobz  
+        @jobz  
         = grep 
         {
             'InventoryRetrieval' eq $_->{ Action }
@@ -56,8 +55,7 @@ SKIP:
         @jobz
         or skip "No inventory jobs", 1;
 
-        my $n       = @jobz;
-        note "Inventory jobs: $n";
+        note 'Inventory jobs: ' . scalar @jobz;
 
         \@jobz
     }

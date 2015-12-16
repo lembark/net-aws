@@ -122,3 +122,51 @@ $vault->download_current_inventory
 # this is not a module
 0
 __END__
+
+=head1 NAME
+
+download_current_inventory -- download inventory of a glacier vault
+
+=head1 SYNOPSIS
+
+    # POD
+
+    download_current_inventory --help;
+    download_current_inventory -h;
+    download_current_inventory -?;
+    download_current_inventory;
+
+    # download a current directory.
+    # access AWS using region, access key, secret from credential file.
+    # deposit result into inventory file path.
+
+    download_current_inventory                      \
+    --credential_path   /credential/file/path.yaml  \
+    --inventory_path    /inventory/output/file/path ;
+
+    # abbreviated args
+
+    download_current_inventory          \
+    --cred  /credential/file/path.yaml  \
+    --inv   /inventory/output/file/path ;
+
+=head1 DESCRIPTION
+
+=head2 Credential File for Glacier.
+
+This is also used with "prove". The format is YAML as a hash-of-hashes
+with "Glacier" providing a set of userid's:
+
+    ---
+    Glacier :
+        User Name:  glacier-test
+            Location:           us-east-2
+            Access Key ID:      ASDFASDFASDFASDFASDF
+            Secret Access Key:  asdfasdfasdfasdfasdfasdfasdfasdfasdf
+        User Name:  real-data        
+            Location:           us-east-1
+            Access Key ID:      ASDFASDFASDFASDFASDF
+            Secret Access Key:  asdfasdfasdfasdfasdfasdfasdfasdfasdf
+
+There may be other AWS services defined in the config file, playing
+with Vaults will access only the Glacier id.

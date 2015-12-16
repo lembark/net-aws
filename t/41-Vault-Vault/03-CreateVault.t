@@ -8,46 +8,44 @@ use Test::More;
 use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
-use Test::Glacier::API;
+use Test::Glacier::Vault;
 
-my $method  = 'create_vault';
-my @argz    = qw( test-glacier-module );
+my @methodz = qw( create delete );
 
-my $found   = eval { $glacier->$method( @argz ) };
+my $vault   = $proto->new( 'test-glacier-module' );
 
-ok ! $@,    "No errors ($@)";
-ok $found,  "$method returns";
-
-note "$method returns:", explain $found;
-note "Error: $@" if $@;
-
-for( reftype $found )
+for my $method ( @methodz )
 {
-    if( ! $_ )
+    eval
     {
-        # nothing more to do
+        $vault->$method;
+        pass "$vault: '$method'";
+
+        my @vaultz  = $vault->list_all;
+        note 'Exisiting vaults:', explain @vaultz;
+
+        my $found   
+        = first { "$vault" eq $_->{ VaultName } } @vaultz;
+
+        if( 'create' eq $method )
+        {
+            $found
+            ? pass "Found '$vault'"
+            : fail "Missing: '$vault'"
+            ;
+        }
+        else
+        {
+            $found
+            ? fail "Leftover: '$vault'"
+            : pass "Removed: '$vault'"
+            ;
+        }
+
+        1
     }
-    elsif( 'ARRAY' eq $_ )
-    {
-        ok @$found, "Found is populated";
-    }
-    elsif( 'HASH' eq $_ )
-    {
-        ok %$found, "Found is populated";
-    }
-    else
-    {
-        pass "Un-handled return type: '$_'";
-    }
+    or fail "$vault: '$method', $@";
 }
-
-my @vaultz  = $glacier->list_vaults;
-
-note 'Exisiting vaults:', explain @vaultz;
-
-my $found   = first { $argz[0] eq $_->{ VaultName } } @vaultz;
-
-ok $found,  "Found vault named '$argz[0]'";
 
 done_testing;
 

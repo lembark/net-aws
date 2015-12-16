@@ -102,6 +102,21 @@ sub delete
     $vault->call_api( 'delete_vault' )
 }
 
+sub list_all
+{
+    # allow calling from prototype objects, which have no name.
+
+    my $proto   = shift;
+
+    my $vault
+    = "$proto"
+    ? $proto
+    : $proto->new( 'placeholder' )
+    ;
+
+    $vault->call_api( 'list_vaults' )
+}
+
 # Generated method names look like:
 #
 # {has|list}_{pending|completed}_{download|inventory}_jobs.
@@ -176,23 +191,15 @@ for
     }
 }
 
-for
-(
-    [ qw( describe  describe_vault  ) ]
-)
+sub describe
 {
-    # downside to AUTOLOAD is that the names with "vault" are
-    # repetative with objects named "$vault".
+$DB::single = 1;
 
-    my ( $install, $dispatch ) = splice @_, 0, 2;
+    my $vault   = shift;
 
-    *{ qualify_to_ref $install }
-    = sub
-    {
-        my $vault   = shift;
-
-        $vault->call_api( $dispatch => @_ )
-    };
+    @_
+    ? $vault->call_api( describe_vault => @_        )
+    : $vault->call_api( describe_vault => "$vault"  )
 }
 
 ########################################################################
