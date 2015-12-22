@@ -5,8 +5,9 @@
 package Net::AWS::Glacier::Vault::Download;
 use v5.20;
 
-use Carp                    qw( carp croak  );
-use File::Spec::Functions   qw( catfile     );
+use Carp                    qw( carp croak      );
+use File::Basename          qw( dirname         );
+use File::Spec::Functions   qw( catdir catfile  );
 
 ########################################################################
 # package variables
@@ -99,10 +100,37 @@ sub write_inventory
     my $job_id  = shift or croak "false job_id";
     my $dest    = shift // $dest_d;
 
-    my $statz   = $vault->call_api( describe_job => $job_id );
-    my $desc    = $statz->{ JobDescription };
+    my $path    
+    = do
+    {
+        my $statz   = $vault->call_api( describe_job => $job_id );
 
+        my $arn     = $statz->{ VaultARN        };
+        my $date    = $statz->{ CreationDate    };
 
+        for my $dir ( catdir $dest, dirname $arn )
+        {
+            -d $dir || mkdir $dir
+            or die "Failed mkdir: '$dir', $!";
+        }
+
+        catfile $dest, "$arn.$date.json"
+    };
+
+    my $json    = $vault->call_api( get_job_output => $job_id );
+
+    open my $fh, '>', $path
+    or die "Failed open: '$path', $!\n";
+
+    local $\;
+
+    print $fh $json
+    or die "Faild write: '$path', $!\n";
+
+    close $fh
+    or die "Faild close: '$path', $!\n";
+
+    $path
 }
 
 sub process_jobs

@@ -3,6 +3,7 @@ use autodie;
 use FindBin::libs;
 use FindBin::libs   qw( realbin base=t subdir=lib subonly   );
 
+use File::Basename  qw( dirname );
 use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
@@ -22,7 +23,7 @@ SKIP:
 
             if( $vault->exists )
             {
-                pass "Vault '$vault' exists";
+                pass "Scratch Vault '$vault' exists";
 
                 if( my $last  = $vault->last_inventory )
                 {
@@ -57,16 +58,24 @@ SKIP:
                 {
                     pass "Inventory exists for '$vault'";
 
+                    my $tmp  = './tmp';
+                    -d $tmp || mkdir $tmp
+                    or BAIL_OUT "Failed mkdir: '$tmp', $!";
+
                     my $path
                     = $vault->download_current_inventory
                     (
-                        './tmp'
+                        $tmp
                     );
 
                     if( -e $path )
                     {
                         -s _    or die "Zero-sized: '$vault' ($path)";
                         -r _    or die "Unreadable: '$vault' ($path)";
+
+                        unlink $path;
+                        rmdir  dirname $path;
+                        rmdir  $tmp;
                     }
                     else
                     {

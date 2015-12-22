@@ -129,8 +129,6 @@ sub has_pending_inventory
 
 sub download_current_inventory
 {
-$DB::single = 1;
-
     my $dest_d  = './';
     my $loop_d  = 12;       # jobs can take 5+ hours.
     my $snooze  = 1800;     # i.e., 6 hours
