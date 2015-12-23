@@ -17,6 +17,8 @@ use List::Util      qw( first           );
 use Scalar::Util    qw( blessed refaddr );
 use Symbol          qw( qualify_to_ref  );
 
+use Net::AWS::Util::Verbose;
+
 use Net::AWS::Const;
 use Net::AWS::Glacier::API;
 

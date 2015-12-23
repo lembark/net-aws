@@ -5,7 +5,7 @@ use Symbol  qw( qualify_to_ref );
 
 my $madness = 'Net::AWS::Util::Verbose';
 
-require_ok Net::AWS::Util::Verbose;
+require_ok $madness;
 
 if( my @found = grep {! index $_, 'VERBOSE' } keys %ENV )
 {
