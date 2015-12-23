@@ -30,9 +30,9 @@ sub read_credential
     my $class   = shift || caller;
     my $path    = shift || $default;
 
-    -e $path  or die "Non-existant: '$path";
-    -r _      or die "Non-readable: '$path";
-    -s _      or die "Empty file: '$path";
+    -e $path  or die "Non-existant: '$path\n";
+    -r _      or die "Non-readable: '$path\n";
+    -s _      or die "Empty file: '$path\n";
 
     my $configz
     = eval
