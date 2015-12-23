@@ -73,9 +73,14 @@ SKIP:
                         -s _    or die "Zero-sized: '$vault' ($path)";
                         -r _    or die "Unreadable: '$vault' ($path)";
 
-                        unlink $path;
-                        rmdir  dirname $path;
-                        rmdir  $tmp;
+                        eval
+                        {
+                            unlink $path;
+                            rmdir  dirname $path;
+                            rmdir  $tmp;
+                            1
+                        }
+                        or BAIL_OUT "Failed cleanup: $@ ($path)";
                     }
                     else
                     {

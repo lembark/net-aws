@@ -193,8 +193,6 @@ for
 
 sub describe
 {
-$DB::single = 1;
-
     my $vault   = shift;
 
     @_

@@ -7,30 +7,49 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::Glacier::API;
+use Test::Glacier::Vault;
 
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault   = "test-glacier-archives";
+    my $vault   = $proto->new( 'test-glacier-archives' );
 
-    $glacier->describe_vault( $vault ) 
+    my $desc    = $vault->describe
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
-    my @pendz   
-    = eval
+    note "Describe: '$vault'\n", explain $desc;
+
+    for my $i ( qw( has list ) )
     {
-        $glacier->list_jobs( $vault )
-    };
+        for my $j ( qw( pending completed ) )
+        {
+            for my $k ( qw( download inventory ) )
+            {
+                my $name    = join '_' => $i, $j, $k, 'jobs';
 
-    $@
-    ? fail "list_jobs: $@"
-    : pass "list_jobs"
-    ;
+                if( $vault->can( $name ) )
+                {
+                    pass "$vault can '$name'";
 
-    note "Job data:\n", explain \@pendz;
+                    eval
+                    {
+                        $vault->$name;
+
+                        pass "$vault->$name returns";
+
+                        1
+                    }
+                    or fail "$vault->$name fails ($@)";
+                }
+                else
+                {
+                    fail "$vault can '$name'";
+                }
+            }
+        }
+    }
 };
 
 done_testing;

@@ -46,7 +46,7 @@ sub list_jobs
     my @passthru
     = do
     {
-        state $api_argz = [ qw( completed limit statuscode onepass ) ];
+        state $api_argz = [ qw( complete limit statuscode onepass ) ];
 
         my %argz    = @_;
 

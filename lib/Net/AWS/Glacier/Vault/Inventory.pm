@@ -150,7 +150,7 @@ sub download_current_inventory
             or 
             $vault->call_api( 'initiate_inventory_retrieval' );
 
-            say "Waiting $snooze sec for inventory ...";
+            say STDOUT "# Waiting $snooze sec for inventory ($_)";
 
             sleep $snooze;
 

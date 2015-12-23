@@ -12,7 +12,7 @@ use YAML::XS    qw( Load            );
 
 use Net::AWS::Glacier::Signature;
 
-use Net::AWS::Util  qw( read_credential );
+use Net::AWS::Util::Credential  qw( read_credential );
 
 ########################################################################
 # package variables

@@ -7,9 +7,9 @@ use autodie;
 
 use Test::More;
 
-use Symbol          qw( qualify_to_ref  );
+use Symbol                      qw( qualify_to_ref  );
 
-use Net::AWS::Util  qw( read_credential );
+use Net::AWS::Util::Credential  qw( read_credential );
 
 ########################################################################
 # package variables
