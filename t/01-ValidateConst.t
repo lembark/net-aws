@@ -7,7 +7,7 @@ use FindBin::libs;
 
 use Test::More;
 
-use Net::AWS::Const;
+use Net::AWS::Util::Const;
 
 ########################################################################
 # package variables

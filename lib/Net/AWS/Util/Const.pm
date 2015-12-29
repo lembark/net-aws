@@ -1,7 +1,7 @@
 ########################################################################
 # housekeeping
 ########################################################################
-package Net::AWS::Const;
+package Net::AWS::Util::Const;
 use v5.20;
 use autodie;
 
@@ -50,7 +50,7 @@ sub import
 
     my $caller  = caller;
     my $name    = @_ ? shift : $def
-    or croak "Bogus Net::AWS::Const: false name";
+    or croak "Bogus Net::AWS::Util::Const: false name";
 
     *{ qualify_to_ref $name => $caller } = \&const;
 
@@ -63,7 +63,7 @@ __END__
 
 =head1 NAME
 
-Net::AWS::Const -- assign a constant to a variable or symbol.
+Net::AWS::Util::Const -- assign a constant to a variable or symbol.
 
 =head1 SYNOPSIS
 
@@ -71,14 +71,14 @@ Net::AWS::Const -- assign a constant to a variable or symbol.
     # this uses Data::Lock, which plays nice with state variables
     # and nested references.
 
-    use Net::AWS::Const;    
+    use Net::AWS::Util::Const;    
 
     const my    $foo    => 'bar';
     const state $bletch => 'blort';
 
     # pick a name, any name...
 
-    use Net::AWS::Const qw( value );
+    use Net::AWS::Util::Const qw( value );
 
     value my $foo => 'bar';
 

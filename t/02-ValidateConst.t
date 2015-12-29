@@ -7,7 +7,7 @@ use FindBin::libs;
 
 use Test::More;
 
-use Net::AWS::Const qw( value );
+use Net::AWS::Util::Const qw( value );
 
 ########################################################################
 # package variables

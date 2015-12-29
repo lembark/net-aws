@@ -7,16 +7,16 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::Glacier::API;
+use Test::Glacier::Vault;
 
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault   = "test-glacier-archives";
+    my $vault   = $proto->new( 'test-glacier-archives' );
 
-    my $vault_data  = $glacier->describe_vault( $vault ) 
+    my $vault_data  = $vault->describe( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
     $vault_data->{ LastInventoryDate } 
@@ -31,7 +31,7 @@ SKIP:
     my $job_id
     = eval
     {
-        $glacier->initiate_inventory_retrieval( $vault, 'JSON' );
+        $vault->initiate_inventory_retrieval( 'JSON' );
 
         pass 'initiate_inventory_retrieval';
 
@@ -47,11 +47,11 @@ SKIP:
     my @found   
     = eval
     {
-        $glacier->list_jobs( $vault )
+        $vault->list_jobs
     }
     or do
     {
-        fail "list_jobs: $@";
+        fail "list_jobs: '$vault', $@";
 
         skip 'No job list analyze', 1
     };
