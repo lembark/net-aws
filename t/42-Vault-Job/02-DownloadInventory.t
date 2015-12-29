@@ -15,7 +15,7 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault   = $proto->( 'test-glacier-archives' );
+    my $vault   = $proto->new( 'test-glacier-archives' );
 
     my $vault_data  = $vault->describe
     or BAIL_OUT "Vault '$vault' does not exist, run prior tests";
@@ -38,7 +38,7 @@ SKIP:
         {
             'InventoryRetrieval' eq $_->{ Action }
         }
-        $vault->list_all_jobs()
+        $vault->list_all_jobs
     }
     or do
     {
@@ -78,7 +78,10 @@ SKIP:
             $struct->{ $_ } and pass "Struct has $_"
             for qw( VaultARN InventoryDate ArchiveList );
 
-            my $type    = reftype $struct->{ ArchiveList };
+            my $arch    = $struct->{ ArchiveList };
+            note "Archives:\n", explain $arch;
+
+            my $type    = reftype $arch;
 
             ok 'ARRAY' eq $type , "ArchiveList is '$type' (ARRAY)";
         }
