@@ -17,9 +17,10 @@ use List::Util      qw( first           );
 use Scalar::Util    qw( blessed refaddr );
 use Symbol          qw( qualify_to_ref  );
 
+use Net::AWS::Util::Const;
 use Net::AWS::Util::Verbose;
 
-use Net::AWS::Const;
+use Net::AWS::Util::Const;
 use Net::AWS::Glacier::API;
 
 # break methods up into usable chunks.
@@ -37,10 +38,11 @@ use Net::AWS::Glacier::Vault::Upload;
 our $VERSION    = '0.01';
 $VERSION        = eval $VERSION;
 
-our @CARP_NOT   = ();
+our @CARP_NOT   = ( __PACKAGE__ );
 
-my $verbose         = '';
-my @arg_fieldz      = qw( api region key secret );
+our $AUTOLOAD   = '';
+
+my @arg_fieldz      = qw( api region key secret jobs );
 my %vault_argz      = ();
 
 ########################################################################
@@ -177,6 +179,8 @@ for
                 # difference betwene "has_*" and "list_*" is that 
                 # former use $onepass to get a single job & quit.
 
+$DB::single = 1;
+
                 local @CARP_NOT = ( __PACKAGE__ );
 
                 my $vault   = shift;
@@ -197,7 +201,8 @@ sub describe
 {
     my $vault   = shift;
 
-    @_
+   const
+    = @_
     ? $vault->call_api( describe_vault => @_        )
     : $vault->call_api( describe_vault => "$vault"  )
 }
@@ -315,6 +320,18 @@ sub call_api
     };
 
     $api->glacier_api( $op, $name, @_ )
+}
+
+AUTOLOAD
+{
+    my $offset  = rindex $AUTOLOAD, ':'
+    or croak "Bogus '$AUTOLOAD', lacks package";
+
+    my $name    = substr $AUTOLOAD, 1 + $offset;
+
+    splice @_, 1, 0, $name;
+
+    goto &call_api
 }
 
 # keep require happy 

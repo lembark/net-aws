@@ -12,7 +12,7 @@ use List::Util      qw( max             );
 use Scalar::Util    qw( reftype         );
 use Symbol          qw( qualify_to_ref  );
 
-use Net::AWS::Const qw( const           );
+use Net::AWS::Util::Const qw( const           );
 
 ########################################################################
 # package variables
