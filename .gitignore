@@ -1,4 +1,4 @@
-etc/test.conf
+*.config
 t/00-*
 /blib/
 /.build/
