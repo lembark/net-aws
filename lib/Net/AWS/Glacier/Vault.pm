@@ -179,9 +179,9 @@ for
                 # difference betwene "has_*" and "list_*" is that 
                 # former use $onepass to get a single job & quit.
 
-$DB::single = 1;
-
                 local @CARP_NOT = ( __PACKAGE__ );
+
+$DB::single = 1;
 
                 my $vault   = shift;
                 my @found   = $vault->filter_jobs( @argz );
@@ -201,10 +201,13 @@ sub describe
 {
     my $vault   = shift;
 
-   const
+    my $data
     = @_
     ? $vault->call_api( describe_vault => @_        )
     : $vault->call_api( describe_vault => "$vault"  )
+    ;
+
+    const $data
 }
 
 ########################################################################
