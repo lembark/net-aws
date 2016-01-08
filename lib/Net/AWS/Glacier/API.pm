@@ -93,6 +93,8 @@ my $generate_request
     state $fixed        = [ 'x-amz-glacier-version' => $aws_version ];
     state $empty        = [];
 
+$DB::single = 1;
+
     my $api     = shift;
     my $method  = shift or croak "false HTTP method";
     my $url     = shift or croak "false URL";
@@ -356,7 +358,7 @@ my $list_jobs
 
     my @argz    = ();
 
-    push @argz, qq{limit="$limit"}          if $limit   != '';
+    push @argz, qq{limit=$limit}            if $limit   != '';
     push @argz, qq{completed="$comp"}       if $comp    != '';
     push @argz, qq{marker="$marker"}        if $marker  != '';
     push @argz, qq{statuscode="$status"}    if $status  != '';
@@ -933,6 +935,8 @@ sub list_jobs
 
 sub list_all_jobs
 {
+$DB::single = 1;
+
     my $api     = shift;
     my @jobz    = ();
 
