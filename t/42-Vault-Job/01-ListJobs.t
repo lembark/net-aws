@@ -55,6 +55,36 @@ SKIP:
 
         skip 'No job list analyze', 1
     };
+
+    for my $i ( qw( has list ) )
+    {
+        for my $j ( qw( pending completed ) )
+        {
+            for my $k ( qw( download inventory ) )
+            {
+                my $name    = join '_' => $i, $j, $k, 'jobs';
+
+                if( $vault->can( $name ) )
+                {
+                    pass "$vault can '$name'";
+
+                    eval
+                    {
+                        $vault->$name;
+
+                        pass "$vault->$name returns";
+
+                        1
+                    }
+                    or fail "$vault->$name fails ($@)";
+                }
+                else
+                {
+                    fail "$vault can '$name'";
+                }
+            }
+        }
+    }
 };
 
 done_testing;

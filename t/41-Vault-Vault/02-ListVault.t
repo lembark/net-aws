@@ -5,11 +5,11 @@ use FindBin::libs;
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::Glacier::API;
+use Test::Glacier::Vault;
  
 my $method  = 'list_vaults';
 
-my @found   = eval { $glacier->$method };
+my @found   = eval { $proto->$method };
 my $error   = $@;
 
 note "Error: $@" if $@;

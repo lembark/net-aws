@@ -7,23 +7,26 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::GlacierUtil;
+use Test::Glacier::Vault;
 
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    for( $glacier->list_vaults )
+    my @found = eval { $proto->list_vaults }
+    or skip "Failed list_vaults: $@", 1;
+
+    for( map { $_->{ VaultName } } @found )
     {
         state $test_rx = qr{^ test- .+ -\d+ $}x;
 
-        my $name    = $_->{ VaultName };
-
-        $name   =~ /$test_rx/o
+        /$test_rx/o
         or next;
 
-        my $message = "Delete test vault: '$name'";
+        note "Remove test vault: '$_'";
+
+        $proto->delete_vault( $_ );
     }
 }
 

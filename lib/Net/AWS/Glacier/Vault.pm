@@ -148,8 +148,8 @@ for
 
         for
         (
-            [ qw( inventory Inventory   ) ],
-            [ qw( download  Download    ) ],
+            [ qw( inventory InventoryRetrieval  ) ],
+            [ qw( download  Download            ) ],
         )
         {
             state $filterz  = {};
@@ -163,7 +163,7 @@ for
             {
                 my $job_statz   = shift;
 
-                $action eq $job_statz->{ JobType } 
+                $action eq $job_statz->{ Action } 
             };
 
             my @argz = 
@@ -180,8 +180,6 @@ for
                 # former use $onepass to get a single job & quit.
 
                 local @CARP_NOT = ( __PACKAGE__ );
-
-$DB::single = 1;
 
                 my $vault   = shift;
                 my @found   = $vault->filter_jobs( @argz );
@@ -298,13 +296,14 @@ DESTROY
 # Vault::* methods all pass through here eventually. 
 ########################################################################
 
+
 sub call_api
 {
     my $vault   = shift;
     my $name    = $$vault
-    || croak "Botched call_api: vault has false name";
+    || croak "Botched call_api: vault has undefined name";
 
-    my $op  = shift
+    my $op      = shift
     or croak "Bogus call_api: missing operation ($name)";
 
     my $argz    = $vault_argz{ refaddr $vault }
@@ -323,6 +322,41 @@ sub call_api
     };
 
     $api->glacier_api( $op, $name, @_ )
+}
+
+sub proto_api
+{
+    # stripped down version for prototype objects calling
+    # global operations (e.g., list_vaults).
+
+    state $proto    = 'Net::AWS::Glacier::API';
+
+    my $vault   = shift;
+
+    my $op      = shift
+    or croak "Bogus call_api: missing operation.";
+
+    my $argz    = $vault_argz{ refaddr $vault }
+    or croak "Un-initialized vault: '$vault'";
+
+    $proto
+    ->new( @{ $argz }[ 1 .. $#arg_fieldz ] )
+    ->glacier_api( $op, '', @_ )
+}
+
+########################################################################
+# some op's are suitable for a prototype since they do not 
+# involve individual vaults.
+
+for my $name ( qw( list_vaults delete_vault ) )
+{
+    *{ qualify_to_ref $name }
+    = sub
+    {
+        my $vault       = shift;
+
+        $vault->proto_api( $name, @_ )
+    };
 }
 
 AUTOLOAD

@@ -8,44 +8,62 @@ use Scalar::Util    qw( reftype );
 
 use Test::More;
 use Test::Deep;
-use Test::GlacierUtil;
+use Test::Glacier::Vault;
 
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault   = "test-glacier-archives";
+    my $vault   = $proto->new( 'test-glacier-archives' );
 
-    $glacier->describe_vault( $vault ) 
+    $vault->describe 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
     my @pass1   
-    = eval
+    eval
     {
-        $glacier->list_jobs( $vault )
-    };
+        $vault->list_jobs;
+        pass "list_jobs";
 
-    $@
-    ? fail "list_jobs: $@"
-    : pass "list_jobs"
-    ;
+        1
+    }
+    or BAIL_OUT "Unable to list jobs: $@";
 
     do
     {
-        my @expect  = grep { ! $_->{ Completed } } @pass1;
-        my @found   = $glacier->list_pending_jobs( $vault );
+        my @expect  
+        = grep
+        {
+            $_->{ Completed }
+            &&
+            'InventoryRetrieval' eq $_->{ Action }
+        }
+        @pass1;
+
+$DB::single = 1;
+
+        my @found   = $vault->list_completed_inventory_jobs;
+
+        cmp_deeply \@found, \@expect, 'Completed Jobs';
+    };
+
+    do
+    {
+        my @expect  
+        = grep
+        {
+            ! $_->{ Completed }
+            &&
+            'InventoryRetrieval' eq $_->{ Action }
+        }
+        @pass1;
+
+        my @found   = $vault->list_pending_inventory_jobs;
 
         cmp_deeply \@found, \@expect, 'Pending Jobs';
     };
 
-    do
-    {
-        my @expect  = grep {   $_->{ Completed } } @pass1;
-        my @found   = $glacier->list_completed_jobs( $vault );
-
-        cmp_deeply \@found, \@expect, 'Completed Jobs';
-    };
 };
 
 done_testing;

@@ -93,8 +93,6 @@ my $generate_request
     state $fixed        = [ 'x-amz-glacier-version' => $aws_version ];
     state $empty        = [];
 
-$DB::single = 1;
-
     my $api     = shift;
     my $method  = shift or croak "false HTTP method";
     my $url     = shift or croak "false URL";
@@ -243,7 +241,7 @@ my $upload_content
 $DB::single = 1;
 
     # anything larger than 4GB requires a mutipart upload.
-    # anything larger than 128GB should use multipart upload.
+    # anything larger than 128MB should use multipart upload.
 
 	my ( $api, $name, $content, $desc ) = @_;
 
@@ -358,10 +356,10 @@ my $list_jobs
 
     my @argz    = ();
 
-    push @argz, qq{limit=$limit}            if $limit   != '';
-    push @argz, qq{completed="$comp"}       if $comp    != '';
-    push @argz, qq{marker="$marker"}        if $marker  != '';
-    push @argz, qq{statuscode="$status"}    if $status  != '';
+    push @argz, qq{limit=$limit}            if $limit   ne '';
+    push @argz, qq{completed=$comp}         if $comp    ne '';
+    push @argz, qq{statuscode=$status}      if $status  ne '';
+    push @argz, qq{marker=$marker}          if $marker  ne '';
 
     $request    .= '?' . join '&' => @argz
     if @argz;
@@ -908,6 +906,12 @@ sub list_jobs
 
     my ( $comp, $limit, $status, $onepass ) = @_;
 
+    if( $limit < 0 )
+    {
+        $marker = '';
+        return
+    }
+
     if( $onepass )
     {
         $limit  = 1;
@@ -935,8 +939,6 @@ sub list_jobs
 
 sub list_all_jobs
 {
-$DB::single = 1;
-
     my $api     = shift;
     my @jobz    = ();
 
