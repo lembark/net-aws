@@ -7,62 +7,38 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::GlacierUtil;
+use Test::Glacier::Vault;
 
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault
-    = eval
-    {
-        my $name    = "test-glacier-archives";
+    my $vault   = $proto->new( 'test-glacier-module' );
 
-        my $found   
-        = first 
-        {
-            $_->{ VaultName } eq $name
-        }
-        $glacier->list_vaults
-        or
-        $glacier->create_vault( $name )
-        or
-        die "Failed create vault: '$name' ($@_)";
+    my $vault_data  = $vault->describe 
+    or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";
 
-        $name
-    }
-    or BAIL_OUT "Error installing test vault: $@";
+    # the stable archive test vault does exist 
 
-    if( my $vault_data  = $glacier->describe_vault( $vault ) )
-    {
-        # the stable archive test vault does exist 
+    $a = $vault_data->{ LastInventoryDate }
+    ? diag "Vault inventory: '$a'"
+    : diag "Vault '$vault' has no inventory", explain $vault_data
+    ;
 
-        $a = $vault_data->{ LastInventoryDate }
-        ? diag "Vault inventory: '$a'"
-        : diag "Vault '$vault' has no inventory", explain $vault_data
-        ;
+    $DB::single = 1;
 
-        $DB::single = 1;
+    my $content = qx{ cat $0 };
 
-        my $content = qx{ cat $0 };
+    my $arch_id 
+    = eval { $vault->upload_archive( $vault, $content ) };
 
-$DB::single = 1;
+    my $error   = $@;
 
-        my $arch_id 
-        = eval { $glacier->upload_archive( $vault, $content ) };
+    note "Error:", $error   if $error;
+    note "ArchID:", $arch_id;
 
-        my $error   = $@;
-
-        note "Error:", $error   if $error;
-        note "ArchID:", $arch_id;
-
-        ok $arch_id, "upload_archive returns archive id ($arch_id)";
-    }
-    else
-    {
-        fail "Vault '$vault' does not exist";
-    }
+    ok $arch_id, "upload_archive returns archive id ($arch_id)";
 };
 
 done_testing;

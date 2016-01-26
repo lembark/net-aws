@@ -54,7 +54,11 @@ sub list_jobs
     };
 
     my @jobz
-    = $vault->call_api
+    = map
+    {
+        Net::AWS::Glacier::Job->new( $_ )
+    }
+    $vault->call_api
     (
         list_all_jobs => @passthru
     );

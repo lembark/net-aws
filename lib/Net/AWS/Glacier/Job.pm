@@ -13,9 +13,9 @@ use overload
 use Carp;
 use NEXT;
 
-use List::Util      qw( first           );
-use Scalar::Util    qw( blessed refaddr );
-use Symbol          qw( qualify_to_ref  );
+use List::Util      qw( first                   );
+use Scalar::Util    qw( blessed refaddr reftype );
+use Symbol          qw( qualify_to_ref          );
 
 use Net::AWS::Util::Const;
 use Net::AWS::Util::Verbose;
@@ -68,6 +68,8 @@ my $sanitize
             delete $hash->{ $k };
         }
     }
+
+    const $hash
 };
 
 ########################################################################
@@ -88,7 +90,7 @@ sub data
     my $found   = $job_datz{ $id }
     or croak "Bogus data: unknown job '$id' ($job)";
 
-    # intentional meta-data leak: 
+    # intentional meta-data leak: caller can manipulate the reference.
 
     @_
     ? $found->{ $_[0] }
@@ -109,25 +111,23 @@ sub construct
 sub initialize
 {
     my $job     = shift;
-    my $inputz  = shift
-    or croak "Bogus initialize: false input hash ($job)";
+    my $statz   = shift
+    or croak "Bogus initialize: false job data ($job)";
 
-    my $id      = $inputz->{ JobId }
-    or croak "Bogus fields: missing 'JobId'";
+    'HASH' eq reftype $statz
+    or croak "Bogus initialize: non-hash job data ($job)";
 
-    $$job       = $id;
+    %$statz
+    or croak "Bogus initialize: empty job data ($job)";
 
-    if( my $found = $job_datz{ $id } )
+    for my $id ( $statz->{ JobId } )
     {
-        # i.e., preserve any prior state stashed in the 
-        # content. callers get to determine if the stuff
-        # is stale for themselves.
+        $id
+        or croak "Bogus fields: missing 'JobId'";
 
-        $found->[0] = const $inputz
-    }
-    else
-    {
-        $job_datz{ $id } = [ const $sanitize->( $inputz ), {} ]
+        $$job       = $id;
+
+        $job_datz{ $id } = $sanitize->( $statz );
     }
 
     $job
@@ -139,8 +139,10 @@ sub new
 
     $job->EVERY::LAST::initialize( @_ );
 
-    # after this point the job is immutable.
-    # not so its inside-out data.
+    # after this point the job and its inside-out data
+    # are immutable (via const) and the inside-out data
+    # is sanitized to avoid JSON boolean objects, empty
+    # elements.
 
     const $job
 }
@@ -149,7 +151,7 @@ sub cleanup
 {
     my $job = shift;
 
-    delete $job_datz{ refaddr $job };
+    delete $job_datz{ "$job" };
 
     return
 }
@@ -192,14 +194,14 @@ Result of JSON::XS:
           'Marker' => undef
           'StartDate' => undef
        'InventorySizeInBytes' => 5235
-       'JobDescription' => 'Inventory test-glacier-archives'
+       'JobDescription' => 'Inventory test-glacier-module'
        'JobId' => 'E_vPiqEmVgLDP7mUUxvT8gAiCb3ai81PVFwlzHuyq-kFa2pQCxAX1NTlRmKElCkk5JGj0Ydi9fYhhvM7BqTuI8w0kijW'
        'RetrievalByteRange' => undef
        'SHA256TreeHash' => undef
        'SNSTopic' => undef
        'StatusCode' => 'Succeeded'
        'StatusMessage' => 'Succeeded'
-       'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-glacier-archives'
+       'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-glacier-module'
    };
 
 =item Object contents
@@ -224,11 +226,11 @@ A few items are munged:
        'InventoryRetrievalParameters' => HASH(0x3a0f858)
           'Format' => 'JSON'
        'InventorySizeInBytes' => 5235
-       'JobDescription' => 'Inventory test-glacier-archives'
+       'JobDescription' => 'Inventory test-glacier-module'
        'JobId' => 'E_vPiqEmVgLDP7mUUxvT8gAiCb3ai81PVFwlzHuyq-kFa2pQCxAX1NTlRmKElCkk5JGj0Ydi9fYhhvM7BqTuI8w0kijW'
        'StatusCode' => 'Succeeded'
        'StatusMessage' => 'Succeeded'
-       'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-glacier-archives'
+       'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-glacier-module'
    };
 
 

@@ -127,7 +127,7 @@ sub has_pending_inventory
     shift @found
 }
 
-sub download_current_inventory
+sub acquire_inventory
 {
     my $dest_d  = './';
     my $loop_d  = 12;       # jobs can take 5+ hours.

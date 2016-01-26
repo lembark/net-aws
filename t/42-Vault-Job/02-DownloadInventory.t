@@ -15,7 +15,7 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault   = $proto->new( 'test-glacier-archives' );
+    my $vault   = $proto->new( 'test-glacier-module' );
 
     my $vault_data  = $vault->describe
     or BAIL_OUT "Vault '$vault' does not exist, run prior tests";

@@ -35,14 +35,14 @@ use Net::AWS::Glacier::Vault::Upload;
 # package variables
 ########################################################################
 
-our $VERSION    = '0.01';
+our $VERSION    = 'v0.01.00';
 $VERSION        = eval $VERSION;
 
 our @CARP_NOT   = ( __PACKAGE__ );
 
 our $AUTOLOAD   = '';
 
-my @arg_fieldz      = qw( api region key secret jobs );
+my @arg_fieldz      = qw( api region key secret jobs desc );
 my %vault_argz      = ();
 
 ########################################################################
@@ -73,53 +73,125 @@ while( my ($i, $name ) = each @arg_fieldz )
     };
 }
 
+for
+(
+    [ qw( last_inventory    LastInventoryDate   ) ],
+    [ qw( creation_date     CreationDate        ) ],
+    [ qw( archive_count     NumberOfArchives    ) ],
+    [ qw( size              SizeInBytes         ) ],
+    [ qw( arn               VaultARN            ) ],
+    [ qw( name              VaultName           ) ],
+)
+{
+    my ( $method, $key ) = @$_;
+
+    *{ qualify_to_ref $method } 
+    = sub 
+    {
+        my $vault   = shift;
+
+        $vault->describe->{ $key }
+    };
+}
+
+########################################################################
+# class methods
+
+sub root_dir
+{
+    state   $root = '/var/tmp';
+
+    if( @_ )
+    {
+        for( $_[0] )
+        {
+            $_  or croak "Bogus root_dir: false path";
+
+            -e $_   or croak "Bogus root_dir: non-existant '$_'";
+            -w _    or croak "Bogus root_dir: non-writeable '$_'";
+            -r _    or croak "Bogus root_dir: non-readable '$_'";
+
+            $root   = $_;
+        }
+    }
+
+    $root
+}
+
+
+########################################################################
+# methods can use prototypes w/ supplied vault name argument.
+
+sub list_all
+{
+    my $proto   = shift;
+
+    $proto->call_api( qw( list_vaults placeholder ) )
+}
+
 sub exists
 {
     my $vault   = shift;
-    my $name    = $$vault;
+    my $name    = shift || $$vault
+    or croak "Bogus exists: prototype vault w/o name argument";
 
-    first 
-    {
-        $name eq $_->{ VaultName }
-    }
-    $vault->call_api( 'list_vaults' )
+    !! $vault->describe( $name )
 }
 
 sub create
 {
-    my $vault   = shift;
-    my $name    = $$vault;
-
-    $vault->exists
-    or 
-    $vault->call_api( create_vault => $name )
-}
-
-sub delete
-{
-    my $vault   = shift;
-    my $name    = $$vault;
-
-    $vault->exists
-    or die "Bogus delete: non-existant vault '$name'";
-
-    $vault->call_api( 'delete_vault' )
-}
-
-sub list_all
-{
-    # allow calling from prototype objects, which have no name.
+    # initialized vault will have a name but may not exist yet
+    # in glacier.
 
     my $proto   = shift;
 
     my $vault
-    = "$proto"
-    ? $proto
-    : $proto->new( 'placeholder' )
+    = @_
+    ? $proto->new( @_ )
+    : $proto
     ;
 
-    $vault->call_api( 'list_vaults' )
+    # i.e., prototype w/o any name argument
+
+    $$vault
+    or croak "Bogus create: prototype vault.";
+
+    if( $vault->exists )
+    {
+        carp "Bogus create: existing '$vault' not created";
+    }
+    else
+    {
+        $vault->call_api( 'create_vault' )
+    }
+
+    $vault
 }
+
+sub delete
+{
+    my $proto   = shift;
+
+    my $vault
+    = @_
+    ? $proto->new( @_ )
+    : $proto
+    ;
+
+    if( $vault->exists )
+    {
+        $vault->call_api( 'delete_vault' )
+    }
+    else
+    {
+        carp "Bogus delete: non-existant vault '$proto'";
+    }
+
+    $vault
+}
+
+########################################################################
+# these require an initialized vault.
 
 # Generated method names look like:
 #
@@ -187,6 +259,13 @@ for
                 $onepass 
                 and return !! @found;
 
+                my @jobz    
+                = map 
+                {
+                    Net::AWS::Glacier::Job->new( $_ ) 
+                }
+                @found;
+
                 wantarray
                 ?  @found
                 : \@found
@@ -199,13 +278,29 @@ sub describe
 {
     my $vault   = shift;
 
-    my $data
-    = @_
-    ? $vault->call_api( describe_vault => @_        )
-    : $vault->call_api( describe_vault => "$vault"  )
-    ;
+    if( @_ )
+    {
+        # i.e., prototype objects can describe a vault by name.
 
-    const $data
+        const $vault->call_api( describe_vault => @_ )
+    }
+    else
+    {
+        $$vault     
+        or croak "Bogus describe: un-named vault";
+
+        eval
+        {
+            const my $desc    
+            = $vault->call_api
+            (
+                describe_vault => "$vault"  
+            );
+
+            $vault->desc( $desc )
+        }
+        or croak "Failed desdribe: unable to describe '$vault' ($@)";
+    }
 }
 
 ########################################################################
@@ -300,11 +395,12 @@ DESTROY
 sub call_api
 {
     my $vault   = shift;
-    my $name    = $$vault
-    || croak "Botched call_api: vault has undefined name";
 
     my $op      = shift
-    or croak "Bogus call_api: missing operation ($name)";
+    or croak "Bogus call_api: missing operation.";
+
+    my $name    = shift || $$vault
+    // croak "Botched call_api: vault has undefined name";
 
     my $argz    = $vault_argz{ refaddr $vault }
     or croak "Un-initialized vault: '$vault'";

@@ -92,32 +92,44 @@ sub write_archive
     };
 }
 
+sub inventory_path
+{
+    $DB::single = 1;
+
+    my $vault   = shift;
+    my $job     = shift
+    or croak "Bogus inventory_path: false job_id";
+
+    my $dest_d  = shift || '.';
+
+    for( '', "$vault" )
+    {
+        $dest_d .= "/$_";
+
+        -e $dest_d || mkdir $dest_d, 02775
+        or die "Failed mkdir: '$dest_d' ($!)";
+
+        -w $dest_d  
+        or die "Botched inventory_path: non-writeable '$dest_d'";
+    }
+
+    # this raises its own exceptions.
+
+    my ( $arn, $date ) 
+    = @{ $job->data }{ qw( VaultARN CreationDate ) };
+
+    catfile $dest_d, "inventory-$date.json"
+}
+
 sub write_inventory
 {
     state $dest_d  = './';
 
     my $vault   = shift;
-    my $job_id  = shift or croak "false job_id";
-    my $dest    = shift // $dest_d;
+    my $job     = shift or croak "false job_id";
+    my $path    = shift || $vault->inventory_path( $job );
 
-    my $path    
-    = do
-    {
-        my $statz   = $vault->call_api( describe_job => $job_id );
-
-        my $arn     = $statz->{ VaultARN        };
-        my $date    = $statz->{ CreationDate    };
-
-        for my $dir ( catdir $dest, dirname $arn )
-        {
-            -d $dir || mkdir $dir
-            or die "Failed mkdir: '$dir', $!";
-        }
-
-        catfile $dest, "$arn.$date.json"
-    };
-
-    my $json    = $vault->call_api( get_job_output => $job_id );
+    my $json    = $vault->call_api( get_job_output => "$job" );
 
     open my $fh, '>', $path
     or die "Failed open: '$path', $!\n";

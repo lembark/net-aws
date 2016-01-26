@@ -14,7 +14,7 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $name    = "test-glacier-archives";
+    my $name    = "test-glacier-module";
 
     my $vault
     = eval

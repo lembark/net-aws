@@ -7,46 +7,22 @@ use File::Basename  qw( dirname );
 use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
+use JSON::XS        qw( decode_json );
+
 use Test::More;
 use Test::Glacier::Vault;
+
+my $test_vault  = "test-glacier-module";
 
 SKIP:
 {
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    for my $vault ( $proto->new( "test-glacier-$$" ) )
-    {
-        eval
-        {
-            $vault->create;
+    $proto->new( $test_vault )->last_inventory
+    or skip "$test_vault lacks inventory, try tomorrow...", 1;
 
-            if( $vault->exists )
-            {
-                pass "Scratch Vault '$vault' exists";
-
-                if( my $last  = $vault->last_inventory )
-                {
-                    fail "Inventory exists for '$vault'";
-                }
-                else
-                {
-                    pass "No inventory for '$vault'";
-                }
-            }
-            else
-            {
-                fail "Vault '$vault' does not exist";
-            }
-
-            $vault->delete;
-
-            1
-        }
-        or fail "$vault: $@";
-    }
-
-    for my $vault ( $proto->new( "test-glacier-archives" ) )
+    for my $vault ( $proto->new( $test_vault ) )
     {
         eval
         {

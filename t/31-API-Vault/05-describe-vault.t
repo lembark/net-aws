@@ -14,6 +14,8 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
+    my $name    = 'test-glacier-module';
+
     for( $glacier->list_vaults ) 
     {
         my $name    = $_->{ VaultName };
