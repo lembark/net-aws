@@ -135,7 +135,7 @@ sub exists
     my $name    = shift || $$vault
     or croak "Bogus exists: prototype vault w/o name argument";
 
-    !! $vault->describe( $name )
+    !! eval{ $vault->describe( $name ) }
 }
 
 sub create
@@ -158,7 +158,7 @@ sub create
 
     if( $vault->exists )
     {
-        carp "Bogus create: existing '$vault' not created";
+        croak "Bogus create: existing '$vault' not created";
     }
     else
     {

@@ -34,7 +34,9 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault   = $proto->create( $name );
+    my $vault   = $proto->new( $name );
+
+    $vault->create;
 
     ok $find_vault->(), "$name exists ($vault)";
 
@@ -50,7 +52,7 @@ SKIP:
 
     eval
     {
-        $proto->delete( $name );
+        $vault->delete;
 
         pass "Deleted vault";
         1

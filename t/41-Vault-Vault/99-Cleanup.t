@@ -14,19 +14,26 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my @found = eval { $proto->list_vaults }
-    or skip "Failed list_vaults: $@", 1;
-
-    for( map { $_->{ VaultName } } @found )
+    my @found 
+    = eval
     {
-        state $test_rx = qr{^ test- .+ -\d+ $}x;
+        map 
+        {
+            $_->{ VaultName } =~ m{^ (test-glacier-\d+) $}x
+        }
+        $proto->list_vaults
+    };
 
-        /$test_rx/o
-        or next;
+    @_  and BAIL_OUT "Failed list_vaults: $@";
 
+    @found 
+    or skip "No cleanup required", 1;
+
+    for( @found )
+    {
         note "Remove test vault: '$_'";
 
-        $proto->delete_vault( $_ );
+        $proto->new( $_ )->delete;
     }
 }
 

@@ -9,15 +9,19 @@ use Test::Glacier::Vault;
  
 my $method  = 'list_vaults';
 
-my @found   = eval { $proto->$method };
-my $error   = $@;
+my $vaultz
+= eval
+{
+    my @resultz = $proto->$method;
 
-note "Error: $@" if $@;
-note "$method returns:", explain @found;
+    note "$method returns:", explain @resultz;
 
-ok ! $error,    "No errors ($error)";
+    \@resultz
+}
+or 
+BAIL_OUT "Failed $proto->$method: $@";
 
-for my $struct ( @found )
+for my $struct ( @$vaultz )
 {
     my $type    = reftype $struct;
 
