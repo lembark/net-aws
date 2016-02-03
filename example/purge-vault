@@ -1,0 +1,67 @@
+#!/bin/env  perl
+########################################################################
+# housekeeping
+########################################################################
+
+use v5.22;
+use FindBin::libs;
+
+use Net::AWS::Glacier;
+
+use Net::AWS::Util::Credential  qw( read_credential );
+
+my $proto
+= do
+{
+    my $keyz = [ qw( region key secret ) ];
+    my %tmp = ();
+    @tmp{ @$keyz }  = read_credential( qw( test Glacier ) );
+
+    Net::AWS::Glacier::Vault->new( '' => %tmp )
+};
+
+# check which arguments actually exist
+
+my @queue
+= map
+{ 
+    $proto->new( $name )->exists
+}
+@ARGV;
+
+while( @queue )
+{
+    while( my ( $i, $vault ) = each @queue )
+    {
+        if( $vault->last_inventory )
+        {
+            if( my $job = $vault->has_completed_inventory_job )
+            {
+                $job->download
+            }
+            elsif( $vault->has_pending_inventory_job )
+            {
+            }
+            else
+            {
+                $vault->initiate_inventory;
+                next
+            };
+        }
+        else
+        {
+        }
+
+
+
+        splice @queue, $i, 1, ();
+    }
+}
+continue
+{
+    sleep 1800;
+}
+
+# this is not a module
+0
+__END__

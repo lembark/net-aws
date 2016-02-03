@@ -97,6 +97,13 @@ sub data
     : $found
 }
 
+sub id
+{
+    my $job = shift;
+
+    $$job
+}
+
 ########################################################################
 # object manglement
 
@@ -111,24 +118,38 @@ sub construct
 sub initialize
 {
     my $job     = shift;
-    my $statz   = shift
-    or croak "Bogus initialize: false job data ($job)";
 
-    'HASH' eq reftype $statz
-    or croak "Bogus initialize: non-hash job data ($job)";
-
-    %$statz
-    or croak "Bogus initialize: empty job data ($job)";
-
-    for my $id ( $statz->{ JobId } )
+    my $id
+    = do
     {
-        $id
-        or croak "Bogus fields: missing 'JobId'";
+        if( 'HASH' eq reftype $_[0] )
+        {
+            # job_id data from listing.
+            # install stats for the job_id.
 
-        $$job       = $id;
+            my $statz   = shift;
 
-        $job_datz{ $id } = $sanitize->( $statz );
-    }
+            %$statz
+            or croak "Bogus initialize: empty job data ($job)";
+
+            my $id   = $statz->{ JobId }
+            or croak "Bogus job stats: false JobId.";
+
+            $$job               = $id;
+            $job_datz{ $id }    = $sanitize->( $statz );
+        }
+        else
+        {
+            # job_id scalar.
+            # re-cycle any existing stats for the job_id.
+
+            my $id  = shift;
+            or croak "Bogus job_id: false value.";
+
+            $$job               = $id;
+            $job_datz{ $id }    ||= { JobId => $id };
+        }
+    };
 
     $job
 }

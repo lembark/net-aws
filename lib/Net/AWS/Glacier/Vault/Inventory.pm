@@ -37,10 +37,10 @@ sub initiate_inventory
     state $cycles_d = 25;
 
     my $vault       = shift;
-    my $cycles      = shift // $cycles_d;
+    my $max_wait    = shift // $cycles_d;
     my $job_id      = '';
 
-    for( my $i = $cycles ; --$i ; sleep $snooze )
+    for( my $i = $max_wait ; $i-- ; sleep $snooze )
     {
         $job_id
         = eval
@@ -57,7 +57,7 @@ sub initiate_inventory
         print substr $@, 0, $i;
     }
 
-    $job_id
+    Net::AWS::Glacier::Job->new( $job_id )
 }
 
 sub last_inventory

@@ -136,6 +136,9 @@ sub exists
     or croak "Bogus exists: prototype vault w/o name argument";
 
     !! eval{ $vault->describe( $name ) }
+    or return;
+
+    $vault
 }
 
 sub create
@@ -274,6 +277,23 @@ for
     }
 }
 
+sub job_status
+{
+    state $api_op   = 'job';
+
+    my $vault   = shift;
+    my $arg     = shift
+    or croak "Bogus job_status: false job object/id";
+
+    my $job_id
+    = blessed $arg
+    ? $arg->job_id
+    : $arg
+    ;
+
+    $vault->call_api( $api_op => $job_id )
+}
+
 sub describe
 {
     my $vault   = shift;
@@ -390,7 +410,6 @@ DESTROY
 # interface to low-level calls.
 # Vault::* methods all pass through here eventually. 
 ########################################################################
-
 
 sub call_api
 {

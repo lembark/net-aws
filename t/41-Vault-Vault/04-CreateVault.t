@@ -42,7 +42,7 @@ SKIP:
 
     eval
     {
-        $proto->create( $name );
+        $vault->create;
 
         fail "Re-created vault '$name'";
 

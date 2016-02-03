@@ -82,11 +82,46 @@ sub filter_jobs
 sub job_status
 {
     my $vault   = shift;
-    my $job_id  = shift
-    or croak "Bogus job_status: false job_id";
+    my $arg     = shift
+    or croak "Bogus job_status: false job object/id";
 
-    my $statz   = $vault->call_api( describe_job => $job_id )
-    or return;
+    my $job
+    = blessed $_[0]
+    ? shift
+    : Net::AWS::Glacier::Job->new( @_ )
+    ;
+
+    my $job_id  = $job->id;
+
+
+
+
+    if(  )
+    {
+        my $job     = shift;
+        my $job_id  = $job->id;
+
+        $job->
+    }
+    else
+    {
+    }
+
+    my $job_id
+    = blessed $arg
+    ? $arg->id
+    : $arg
+    ;
+
+    my $statz   = $vault->call_api( describe_job => $job_id );
+
+    if( 
+}
+
+sub job_complete
+{
+    my $vault   = shift;
+    my $statz   = $vault->job_status( @_ );
 
     $statz->{ Completed } 
     or return;
