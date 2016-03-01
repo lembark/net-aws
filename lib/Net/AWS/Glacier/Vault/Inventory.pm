@@ -15,7 +15,7 @@ qw
     last_inventory
     has_current_inventory
     has_pending_inventory
-    download_current_inventory
+    acquire_inventory
 );
 
 ########################################################################

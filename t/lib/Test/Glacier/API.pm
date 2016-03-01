@@ -28,7 +28,7 @@ sub import
 {
     use_ok $madness;
 
-    my @credz   = read_credential qw( test Glacier );
+    my @credz   = read_credential qw( glacier-test Glacier );
     my $caller  = caller;
 
     Net::AWS::Glacier::Signature->verbose

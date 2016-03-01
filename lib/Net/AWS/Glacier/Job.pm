@@ -29,8 +29,6 @@ $VERSION        = eval $VERSION;
 
 our @CARP_NOT   = ( __PACKAGE__ );
 
-our $AUTOLOAD   = '';
-
 my %job_datz    = ();
 
 ########################################################################
@@ -69,6 +67,8 @@ my $sanitize
         }
     }
 
+    $hash->{ timestamp }    = time;
+
     const $hash
 };
 
@@ -76,7 +76,7 @@ my $sanitize
 # methods
 ########################################################################
 
-sub data
+sub data : lvalue
 {
     my $job = shift;
 
@@ -85,16 +85,70 @@ sub data
     ? $$job
     : shift
     or 
-    croak "Bogus data: un-blessed job with false argument";
+    croak "Bogus data: un-blessed job/false job_id";
 
-    my $found   = $job_datz{ $id }
-    or croak "Bogus data: unknown job '$id' ($job)";
+    $job_datz{ $id }
+}
 
-    # intentional meta-data leak: caller can manipulate the reference.
+sub description
+{
+    my $job     = shift;
 
     @_
-    ? $found->{ $_[0] }
-    : $found
+    ? $job->data    =   $sanitize->( $_[0] )
+    : $job->data    ||= $sanitize->( { JobId => $$job } )
+}
+
+########################################################################
+# access job description
+
+for
+(
+    [ qw( type      Action          ) ],
+    [ qw( status    StatusCode      ) ],
+    [ qw( complete  Completed       ) ],
+    [ qw( message   StatusMessage   ) ],
+    [ qw( timestamp timestamp       ) ],
+)
+{
+    my ( $name, $key ) = @$_;
+
+    *{ qualify_to_ref $name }
+    = sub
+    {
+        my $job = shift;
+        $job->data->{ $key }
+    };
+}
+
+for
+(
+    [ qw( is_download   type        ArchiveRetrieval    ) ],
+    [ qw( is_inventory  type        InventoryRetrieval  ) ],
+    [ qw( success       status      Succeeded           ) ],
+)
+{
+    my ( $name, $method, $value ) = @$_;
+
+    *{ qualify_to_ref $name }
+    = sub
+    {
+        my $job = shift;
+        $value eq $job->$method
+    };
+}
+
+########################################################################
+# hardwired accessors
+
+sub window
+{
+    state $window_def   = 3600;
+    state $window       = $window_def;
+
+    @_ > 1
+    ? $window  = $_[1] // $window_def
+    : $window
 }
 
 sub id
@@ -102,6 +156,20 @@ sub id
     my $job = shift;
 
     $$job
+}
+
+sub expired
+{
+    my $job = shift;
+
+    time > $job->window + $job->timestamp
+}
+
+sub effective
+{
+    my $job = shift;
+
+    ! $job->expired
 }
 
 ########################################################################
@@ -119,37 +187,35 @@ sub initialize
 {
     my $job     = shift;
 
-    my $id
-    = do
+    $_[0]
+    or croak 'Bogus initialize: false job input (stats/id)';
+
+    if( 'HASH' eq reftype $_[0] )
     {
-        if( 'HASH' eq reftype $_[0] )
-        {
-            # job_id data from listing.
-            # install stats for the job_id.
+        # job_id data from listing.
+        # install stats for the job_id.
 
-            my $statz   = shift;
+        my $statz   = shift;
 
-            %$statz
-            or croak "Bogus initialize: empty job data ($job)";
+        %$statz
+        or croak "Bogus initialize: empty job data ($job)";
 
-            my $id   = $statz->{ JobId }
-            or croak "Bogus job stats: false JobId.";
+        my $id   = $statz->{ JobId }
+        or croak "Bogus job stats: false JobId.";
 
-            $$job               = $id;
-            $job_datz{ $id }    = $sanitize->( $statz );
-        }
-        else
-        {
-            # job_id scalar.
-            # re-cycle any existing stats for the job_id.
+        $$job       = $id;
 
-            my $id  = shift;
-            or croak "Bogus job_id: false value.";
+        $job->status( $statz );
+    }
+    else
+    {
+        # job_id scalar.
+        # re-cycle any existing stats for the job_id.
 
-            $$job               = $id;
-            $job_datz{ $id }    ||= { JobId => $id };
-        }
-    };
+        my $id      = shift;
+        $$job       = $id;
+        $job->data  ||= { JobId => $id };
+    }
 
     $job
 }
@@ -253,5 +319,3 @@ A few items are munged:
        'StatusMessage' => 'Succeeded'
        'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-glacier-module'
    };
-
-

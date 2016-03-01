@@ -30,7 +30,7 @@ sub import
 
         my $keyz = [ qw( region key secret ) ];
         my %tmp = ();
-        @tmp{ @$keyz }  = read_credential( qw( test Glacier ) );
+        @tmp{ @$keyz }  = read_credential( qw( glacier-test Glacier ) );
 
         $madness->new( '' => %tmp )
     };

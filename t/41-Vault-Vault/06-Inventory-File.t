@@ -69,8 +69,10 @@ SKIP:
                     -d $tmp || mkdir $tmp
                     or BAIL_OUT "Failed mkdir: '$tmp', $!";
 
+$DB::single = 1;
+
                     my $path
-                    = $vault->download_current_inventory
+                    = $vault->acquire_inventory
                     (
                         $tmp
                     );

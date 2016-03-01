@@ -28,6 +28,7 @@ use Net::AWS::Glacier::API;
 use Net::AWS::Glacier::Vault::Download;
 use Net::AWS::Glacier::Vault::Inventory;
 use Net::AWS::Glacier::Vault::Jobs;
+use Net::AWS::Glacier::Vault::Inventory;
 use Net::AWS::Glacier::Vault::LocalInventory;
 use Net::AWS::Glacier::Vault::Upload;
 
@@ -42,8 +43,10 @@ our @CARP_NOT   = ( __PACKAGE__ );
 
 our $AUTOLOAD   = '';
 
-my @arg_fieldz      = qw( api region key secret jobs desc );
 my %vault_argz      = ();
+
+my @arg_fieldz      = qw( region key secret api jobs expire desc );
+my @api_fieldz      = @arg_fieldz[ 0 .. 2 ];
 
 ########################################################################
 # this module contains code for:
@@ -52,6 +55,18 @@ my %vault_argz      = ();
 #   call low-level API
 # anything else is in one of the Net::AWS::Glacier::Vault::* modules.
 ########################################################################
+
+########################################################################
+# class methods
+
+sub expire_window
+{
+    state $cutoff   = 3600;
+
+    @_ > 1 
+    ? $cutoff  = $_[1]
+    : $cutoff
+}
 
 ########################################################################
 # manufactured methods
@@ -64,7 +79,9 @@ while( my ($i, $name ) = each @arg_fieldz )
     = sub
     {
         my ( $vault, $value ) = @_;
-        my $argz    = $vault_argz{ refaddr $vault }
+        my $name    = $$vault
+        or croak "Bogus $name: prototype vault lacks data";
+        my $argz    = $vault_argz{ $name }
         or croak "Bogus $name: uninitialized object '$vault'";
 
         @_ > 1
@@ -86,7 +103,7 @@ for
     my ( $method, $key ) = @$_;
 
     *{ qualify_to_ref $method } 
-    = sub 
+    = sub
     {
         my $vault   = shift;
 
@@ -117,7 +134,6 @@ sub root_dir
 
     $root
 }
-
 
 ########################################################################
 # methods can use prototypes w/ supplied vault name argument.
@@ -294,33 +310,56 @@ sub job_status
     $vault->call_api( $api_op => $job_id )
 }
 
+sub acquire_desc
+{
+    my $vault   = shift;
+
+    my $name    = shift || $$vault
+    or croak "Bogus acquire_desc: prototype vault lacks name";
+
+    $vault->call_api( describe_vault => $name )
+}
+
 sub describe
 {
     my $vault   = shift;
 
     if( @_ )
     {
-        # i.e., prototype objects can describe a vault by name.
+        # i.e., any vault object can describe a vault by name.
 
-        const $vault->call_api( describe_vault => @_ )
+        const $vault->acquire_desc( @_ )
     }
     else
     {
         $$vault     
-        or croak "Bogus describe: un-named vault";
+        or croak "Bogus describe: prototype vault";
 
+        my $argz    = $vault_argz{ refaddr $vault };
+
+        my $now     = time;
+
+        $now > $vault->expire
+        and $vault->desc( '' );
+
+        $vault->desc
+        or
         eval
         {
-            const my $desc    
-            = $vault->call_api
+            $vault->desc
             (
-                describe_vault => "$vault"  
+                $vault->acquire_desc
             );
 
-            $vault->desc( $desc )
+            $vault->expire
+            (
+                $now + $vault->expire_window
+            );
         }
         or croak "Failed desdribe: unable to describe '$vault' ($@)";
     }
+
+    $vault
 }
 
 ########################################################################
@@ -343,15 +382,7 @@ sub construct
     my $proto   = shift;
     my $class   = blessed $proto;
 
-    my $vault   = bless \( my $a = '' ), $class || $proto;
-
-    $vault_argz{ refaddr $vault } 
-    = $class
-    ? $vault_argz{ refaddr $proto }
-    : []
-    ;
-
-    $vault
+    bless \( my $a = '' ), $class || $proto
 }
 
 sub initialize
@@ -360,16 +391,22 @@ sub initialize
 
     my ( $vault, $name, %initz ) = @_;
 
-    $$vault     = $name;
-
-    if( @_ > 1 )
+    if( $$vault = $name )
     {
-        for( @arg_fieldz )
-        {
-            my $value   = $initz{ $_ } // next;
+        my $argz    = $vault_argz{ $name } ||= [];
 
-            $vault->$_( $value );
+        if( %initz )
+        {
+            while( my ( $i, $key ) = each @api_fieldz )
+            {
+                my $value   = $initz{ $key }
+                // next;
+
+                $argz->[ $i ] //= $value;
+            }
         }
+
+        $vault->expire( 0 );
     }
 
     $vault
@@ -392,7 +429,10 @@ sub cleanup
 {
     my $vault = shift;
 
-    delete $vault_argz{ refaddr $vault };
+    if( my $name = $$vault )
+    {
+        delete $vault_argz{ $name };
+    }
 
     return
 }
@@ -413,6 +453,14 @@ DESTROY
 
 sub call_api
 {
+    my $api_off 
+    = first 
+    {
+        'api' eq $arg_fieldz[$_]  
+    }
+    ( 0 .. $#arg_fieldz )
+    // die "Bogus arg_fieldz: missing 'api'";
+
     my $vault   = shift;
 
     my $op      = shift
@@ -428,12 +476,12 @@ sub call_api
     # depending on how the vaults are used this might be usable as
     # a shared object, but for now this works.
 
-    my $api     = $argz->[0]
+    my $api     = $argz->[ $api_off ]
     ||= do
     {
         state $proto    = 'Net::AWS::Glacier::API';
 
-        $proto->new( @{ $argz }[ 1 .. $#arg_fieldz ] )
+        $proto->new( @{ $argz }[ 0 .. $#api_fieldz ] )
     };
 
     $api->glacier_api( $op, $name, @_ )

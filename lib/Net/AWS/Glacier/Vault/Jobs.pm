@@ -93,29 +93,10 @@ sub job_status
 
     my $job_id  = $job->id;
 
-
-
-
-    if(  )
-    {
-        my $job     = shift;
-        my $job_id  = $job->id;
-
-        $job->
-    }
-    else
-    {
-    }
-
-    my $job_id
-    = blessed $arg
-    ? $arg->id
-    : $arg
-    ;
-
-    my $statz   = $vault->call_api( describe_job => $job_id );
-
-    if( 
+    $job->statz
+    (
+        $vault->call_api( describe_job => $job_id )
+    )
 }
 
 sub job_complete
