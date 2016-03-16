@@ -1,6 +1,6 @@
 package Net::AWS::Glacier::Test;
 
-use v5.20;
+use v5.22;
 use autodie;
 use FindBin::libs;
 
@@ -13,30 +13,65 @@ sub MiB()   { 2 ** 20 };
 
 use Net::AWS::Glacier::TreeHash qw( tree_hash reduce_hash );
 
-my @letterz = ( 'a' .. 'z' ), ( 'A' .. 'Z' );
-my @buffsiz = map { 2 ** $_ } ( 0 .. 9 );
+my @letterz = ( 'a' .. 'z' );
+my @buffsiz = map { 2 ** $_ } ( 0 .. 10 );
+
+my $format  = '(a' . 2**20 . ')*';
+
+sub imperative
+{
+    $_[0] // return;
+
+    my $count   = @_ / 2 + @_ % 2;
+
+    @_
+    = map
+    {
+        sha256 splice @_, 0, 2
+    }
+    ( 1 .. $count )
+    ;
+
+    @_ > 1
+    and goto __SUB__;
+
+    $_[0]
+}
 
 for my $size ( @buffsiz )
 {
-    my $a       = $letterz[ rand @letterz ];
-    my $buffer  = $a x ( $size * MiB );
-
-    my $t0      = Benchmark->new;
-    my $found   = tree_hash $buffer;
-    my $t1      = Benchmark->new;
-
-    my @hashz
-    = map
+    my @argz
+    = do
     {
-        sha256 substr $buffer, 0, MiB, '' 
-    }
-    ( 1 .. $size );
+        my $a       = $letterz[ rand @letterz ];
 
-    my $expect  = reduce_hash @hashz;
+        unpack $format => $a x ( $size * MiB );
+    };
 
-    ok $found == $expect, "Hash $size MiB";
+    my ( $expect, $pass1 )
+    = do
+    {
+        my $t0      = Benchmark->new; 
+        my $hash    = imperative @argz;
+        my $t1      = Benchmark->new;
 
-    note 'tree_hash: ', timestr timediff $t1, $t0;
+        ( $hash, timestr timediff $t1, $t0 )
+    };
+
+    my ( $found, $pass2 )
+    = do
+    {
+        my $t0      = Benchmark->new;
+        my $hash    = reduce_hash @argz;
+        my $t1      = Benchmark->new;
+
+        ( $hash, timestr timediff $t1, $t0 )
+    };
+
+    ok $found == $expect,   "imperative == FP-ish   ($size MiB)";
+
+    note 'imperative:', $pass1;
+    note 'pseudo-fp: ', $pass2;
 }
 
 done_testing;

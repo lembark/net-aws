@@ -8,11 +8,13 @@ use experimental qw( lexical_subs autoderef );
 
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
-use List::Util      qw( max             );
+use List::Util      qw( min             );
 use Scalar::Util    qw( reftype         );
 use Symbol          qw( qualify_to_ref  );
 
 use Net::AWS::Util::Const qw( const           );
+
+use SameWith;
 
 ########################################################################
 # package variables
@@ -25,27 +27,26 @@ $VERSION = eval $VERSION;
 # utility subs
 ########################################################################
 
-const my $reduce_hash =>
-sub
+const my $reduce_hash 
+= sub
 {
-    # iterate reducing the pairs of 1MiB data units to a single value.
-    # "2 > @_" intentionally returns undef for an empty list.
+    const my $last = int( @_ / 2 + @_ % 2 - 1 );
 
-    return $_[0]
-    if 2 > @_;
-
-    const my $chunks => ( @_ / 2 ) + ( @_ % 2 );
-
-    @_  
+    @_
     = map
     {
-        const my $i => 2 * ( $_ - 1 );
-
-        sha256 @_[ $i .. max( $i+1, $#_) ]
+        sha256 @_[ $_, $_ + 1 ]
     }
-    ( 1 .. $chunks );
+    map
+    {
+        2 * $_
+    }
+    ( 0 .. $last );
 
-    goto __SUB__
+    $last
+    and goto __SUB__;
+
+    $_[0]
 };
 
 const my $buffer_hash =>
@@ -55,16 +56,8 @@ sub
     const my $buffer => shift;
 
     length $buffer
-    or return;
-
-    $reduce_hash->
-    (
-        map
-        {
-            sha256 $_
-        }
-        unpack $format, $buffer
-    )
+    ? $reduce_hash->( unpack $format, $buffer )
+    : ()
 };
 
 sub import
