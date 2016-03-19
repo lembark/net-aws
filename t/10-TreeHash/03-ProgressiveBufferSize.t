@@ -9,6 +9,8 @@ use Test::More;
 use Benchmark   qw( :hireswallclock );
 use Digest::SHA qw( sha256          );
 
+use Keyword::Declare;
+
 sub MiB()   { 2 ** 20 };
 
 use Net::AWS::Glacier::TreeHash qw( tree_hash reduce_hash );
@@ -18,10 +20,8 @@ my @buffsiz = map { 2 ** $_ } ( 0 .. 10 );
 
 my $format  = '(a' . 2**20 . ')*';
 
-sub imperative
+sub explicit_tail
 {
-    $_[0] // return;
-
     my $count   = @_ / 2 + @_ % 2;
 
     @_
@@ -38,6 +38,34 @@ sub imperative
     $_[0]
 }
 
+keyword fold ( Ident $name, Block $new_list )
+{
+    my $code
+    = qq
+    {
+        sub $name
+        {
+            ( \@_  = do $new_list ) > 1
+            and goto __SUB__;
+
+            shift
+        }
+    };
+
+    $code
+}
+
+fold implicit_tail
+{
+    my $count   = @_ / 2 + @_ % 2;
+
+    map
+    {
+        sha256 splice @_, 0, 2
+    }
+    ( 1 .. $count )
+}
+
 for my $size ( @buffsiz )
 {
     my @argz
@@ -48,30 +76,37 @@ for my $size ( @buffsiz )
         unpack $format => $a x ( $size * MiB );
     };
 
-    my ( $expect, $pass1 )
-    = do
+    my @resultz
+    = map
     {
+        my $handler = __PACKAGE__->can( $_ )
+        or BAIL_OUT "Unknown handler: '$_'";
+
         my $t0      = Benchmark->new; 
-        my $hash    = imperative @argz;
+        my $hash    = $handler->( @argz );
         my $t1      = Benchmark->new;
 
-        ( $hash, timestr timediff $t1, $t0 )
-    };
+        [ $_ => $hash, timestr timediff $t1, $t0 ]
+    }
+    qw
+    (
+        explicit_tail
+        implicit_tail
+        reduce_hash
+    );
 
-    my ( $found, $pass2 )
-    = do
+    my $first   = $resultz[0][0];
+    my $expect  = $resultz[0][1];
+
+    for( @resultz[ 1 .. $#resultz ] )
     {
-        my $t0      = Benchmark->new;
-        my $hash    = reduce_hash @argz;
-        my $t1      = Benchmark->new;
+        my ( $name, $found, $time ) = @$_;
 
-        ( $hash, timestr timediff $t1, $t0 )
-    };
+        ok $found == $expect, "$first == $name";
+    }
 
-    ok $found == $expect,   "imperative == FP-ish   ($size MiB)";
-
-    note 'imperative:', $pass1;
-    note 'pseudo-fp: ', $pass2;
+    note "Buffer size = $size MiB";
+    note map { sprintf "%14s = %s (%x)\n" => @$_[0,2] } @resultz;
 }
 
 done_testing;

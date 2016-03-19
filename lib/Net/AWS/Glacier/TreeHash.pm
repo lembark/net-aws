@@ -14,7 +14,24 @@ use Symbol          qw( qualify_to_ref  );
 
 use Net::AWS::Util::Const qw( const           );
 
-use SameWith;
+use Keyword::Declare;
+
+keyword fold ( Ident $name, Block $new_list )
+{
+    my $code
+    = qq
+    {
+        sub $name
+        {
+            ( \@_  = do $new_list ) > 1
+            and goto __SUB__;
+
+            shift
+        }
+    };
+
+    $code
+}
 
 ########################################################################
 # package variables
@@ -26,6 +43,21 @@ $VERSION = eval $VERSION;
 ########################################################################
 # utility subs
 ########################################################################
+
+fold reduce_hash
+{
+    const my $last = int( @_ / 2 + @_ % 2 - 1 );
+
+    map
+    {
+        const sha256 @_[ $_, $_ + 1 ]
+    }
+    map
+    {
+        const ( 2 * $_ )
+    }
+    ( 0 .. $last )
+}
 
 const my $reduce_hash 
 = sub
