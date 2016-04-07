@@ -9,6 +9,11 @@ use Test::Glacier::Vault;
  
 my $method  = 'list_vaults';
 
+can_ok $proto, $method
+or BAIL_OUT "Vault cannot '$method'";
+
+$DB::single = 1;
+
 my $vaultz
 = eval
 {

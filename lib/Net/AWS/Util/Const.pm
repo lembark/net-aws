@@ -13,7 +13,7 @@ use Symbol      qw( qualify_to_ref  );
 # package variables
 ########################################################################
 
-our $VERSION    = '0.01';
+our $VERSION    = '0.02';
 eval $VERSION;
 
 our @CARP_NOT   = ( __PACKAGE__ );
@@ -42,7 +42,7 @@ sub const : lvalue
 
 sub import
 {
-    state $def  = 'const';
+    const state $def  = 'const';
 
     # dicard the dispatching class.
 
@@ -63,7 +63,7 @@ __END__
 
 =head1 NAME
 
-Net::AWS::Util::Const -- assign a constant to a variable or symbol.
+Net::AWS::Util::Const -- define a variable as constant.
 
 =head1 SYNOPSIS
 
@@ -76,15 +76,17 @@ Net::AWS::Util::Const -- assign a constant to a variable or symbol.
     const my    $foo    => 'bar';
     const state $bletch => 'blort';
 
+    # flag the variable as constant after assignment.
+
+    my $verbose = '';
+
+    const $verbose;
+
     # pick a name, any name...
 
     use Net::AWS::Util::Const qw( value );
 
     value my $foo => 'bar';
-
-    # take an existing varaible and make it const.
-
-    const my $verbose;
 
     # this will carp if debug is set, but works.
 
@@ -94,6 +96,9 @@ Net::AWS::Util::Const -- assign a constant to a variable or symbol.
 
 The const sub is declared an "lvalue", it returns a dlock-ed 
 reference to the initial variable with the second argument.
+
+The main point of this is delaying application of the const flag 
+until after state has set its flag.
 
 =head1 SEE ALSO
 

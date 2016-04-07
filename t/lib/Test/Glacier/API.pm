@@ -26,9 +26,11 @@ my $madness = 'Net::AWS::Glacier::API';
 
 sub import
 {
+$DB::single = 1;
+
     use_ok $madness;
 
-    my @credz   = read_credential qw( glacier-test Glacier );
+    my @credz   = read_credential qw( test Glacier );
     my $caller  = caller;
 
     Net::AWS::Glacier::Signature->verbose

@@ -4,7 +4,7 @@ The Canonical String for this request should have been
 #
 date:20150204T022601Z
 host:glacier.us-west-1.amazonaws.com
-x-amz-archive-description:test-glacier-module
+x-amz-archive-description:test-net-aws-glacier
 x-amz-content-sha256:c5dbf41c3e8e561b25d6cbe536b4c007f047689593796b017f66491a619cd568
 x-amz-glacier-version:2012-06-01
 x-amz-sha256-tree-hash:ÅÛ�>VÖË�6�À�GhykfIaÕh

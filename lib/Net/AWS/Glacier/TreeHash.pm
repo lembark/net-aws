@@ -12,14 +12,13 @@ use List::Util      qw( min             );
 use Scalar::Util    qw( reftype         );
 use Symbol          qw( qualify_to_ref  );
 
-use Net::AWS::Util::Const qw( const           );
+use Net::AWS::Util::Const qw( const     );
 
 use Keyword::Declare;
 
 keyword fold ( Ident $name, Block $new_list )
 {
-    my $code
-    = qq
+    qq
     {
         sub $name
         {
@@ -28,9 +27,7 @@ keyword fold ( Ident $name, Block $new_list )
 
             shift
         }
-    };
-
-    $code
+    }
 }
 
 ########################################################################
@@ -59,38 +56,15 @@ fold reduce_hash
     ( 0 .. $last )
 }
 
-const my $reduce_hash 
-= sub
-{
-    const my $last = int( @_ / 2 + @_ % 2 - 1 );
-
-    @_
-    = map
-    {
-        sha256 @_[ $_, $_ + 1 ]
-    }
-    map
-    {
-        2 * $_
-    }
-    ( 0 .. $last );
-
-    $last
-    and goto __SUB__;
-
-    $_[0]
-};
-
-const my $buffer_hash =>
-sub
+sub buffer_hash
 {
     state $format   = '(a' . 2**20 . ')*';
     const my $buffer => shift;
 
     length $buffer
-    ? $reduce_hash->( unpack $format, $buffer )
+    ? reduce_hash unpack $format, $buffer
     : ()
-};
+}
 
 sub import
 {
@@ -98,8 +72,8 @@ sub import
     {
         tree_hash       => \&tree_hash,
         tree_hash_hex   => \&tree_hash_hex,
-        reduce_hash     => $reduce_hash,
-        buffer_hash     => $buffer_hash,
+        reduce_hash     => \&reduce_hash,
+        buffer_hash     => \&buffer_hash,
     };
 
     shift;
@@ -131,11 +105,11 @@ sub tree_hash
 
     if( '' eq $type  )
     {
-        &$buffer_hash
+        &buffer_hash
     }
     elsif( 'ARRAY' eq $type )
     {
-        $reduce_hash->( values $_[0] )
+        reduce_hash values $_[0]
     }
     else
     {

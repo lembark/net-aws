@@ -15,7 +15,7 @@ SKIP:
     $ENV{ AWS_GLACIER_FULL }
     or skip "AWS_GLACIER_FULL not set", 1;
 
-    my $vault   = "test-glacier-module";
+    my $vault   = "test-net-aws-glacier";
 
     my $vault_data  = $glacier->describe_vault( $vault ) 
     or BAIL_OUT "Vault '$vault' does not exist, run '12-*' tests";

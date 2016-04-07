@@ -111,7 +111,7 @@ sub has_pending_inventory
     {
         my $job = shift;
 
-        $job->{ Action } eq 'Inventory'
+        'Inventory' eq $job->action
     };
 
     my $vault   = shift;

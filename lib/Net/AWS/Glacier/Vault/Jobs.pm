@@ -7,6 +7,8 @@ use v5.20;
 
 use Carp    qw( croak   );
 
+use Net::AWS::Glacier::Job;
+
 use Exporter::Proxy
 qw
 (
@@ -60,7 +62,7 @@ sub list_jobs
     }
     $vault->call_api
     (
-        list_all_jobs => @passthru
+        list_all_jobs => '', @passthru
     );
 
     wantarray

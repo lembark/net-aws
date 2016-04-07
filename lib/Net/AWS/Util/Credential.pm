@@ -23,10 +23,10 @@ our $VERSION    = '0.01';
 
 sub read_credential
 {
-    my $default = $ENV{ NET_AWS_CONFIG } || "$etc/net-aws.config";
+    my $default = $ENV{ NET_AWS_CONFIG } || "$etc/net-aws.config.yaml";
 
-    my $user    = shift
-    or die 'Bogus read_credential: false user';
+    my $name    = shift
+    or die 'Bogus read_credential: false user name';
     my $class   = shift || caller;
     my $path    = shift || $default;
 
@@ -50,8 +50,8 @@ sub read_credential
     my $name2credz  = $configz->{ $class }
     or die "Unknown class: '$class' ($path)\n";
 
-    my $credz       = $name2credz->{ $user }
-    or die "Unknown user: '$user' ('$class', '$path')\n";
+    my $credz       = $name2credz->{ $name }
+    or die "Unknown user: '$name' ('$class', '$path')\n";
 
     wantarray
     ?   @$credz

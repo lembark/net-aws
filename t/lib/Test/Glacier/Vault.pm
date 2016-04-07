@@ -28,9 +28,9 @@ sub import
     {
         require_ok $madness;
 
-        my $keyz = [ qw( region key secret ) ];
-        my %tmp = ();
-        @tmp{ @$keyz }  = read_credential( qw( glacier-test Glacier ) );
+        my $keyz        = [ qw( region key secret ) ];
+        my %tmp         = ();
+        @tmp{ @$keyz }  = read_credential qw( test Glacier );
 
         $madness->new( '' => %tmp )
     };

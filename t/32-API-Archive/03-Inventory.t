@@ -17,7 +17,7 @@ SKIP:
     my $vault
     = eval
     {
-        my $name    = "test-glacier-module";
+        my $name    = "test-net-aws-glacier";
 
         my $found   
         = first 
