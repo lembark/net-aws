@@ -93,11 +93,9 @@ sub job_status
     : Net::AWS::Glacier::Job->new( @_ )
     ;
 
-    my $job_id  = $job->id;
-
     $job->statz
     (
-        $vault->call_api( describe_job => $job_id )
+        $vault->call_api( describe_job => "$job" )
     )
 }
 

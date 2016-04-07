@@ -196,7 +196,7 @@ sub upload_singlepart
 
     say "Upload: '$desc' ($name)";
 
-    $vault->call_api( upload_archive => $fh, $desc );
+    $vault->call_api( upload_archive => '', $fh, $desc )
 }
 
 sub upload_paths
@@ -204,7 +204,7 @@ sub upload_paths
     my $vault = shift;
     @_  or return;
 
-    my $name    = $$vault
+    "$vault"
     or croak "Bogus upload_paths: vault lacks name";
 
     my %path2arch   = ();
@@ -214,23 +214,21 @@ sub upload_paths
         my ( $path, $desc )
         = ( ref )
         ? @$_
-        : do
-        {
-            my $base    = join '-', split /\s+/, basename $_;
+        : ( $_, '' )
+        ;
 
-            ( $_ => $base )
-        };
+        $desc   ||= join '-', split /\s+/, $_;
 
         eval
         {
-            open my $fh, '<', $path;
-
-            say "Upload: '$path' as '$desc' ($name)";
+            say "Upload: '$path' as '$desc' ($vault)";
 
 # check -s here to decide on single- or multi-part uploads.
 
             $path2arch{ $path } 
-            = $vault->upload_singlepart( $fh, $desc );
+            = $vault->upload_singlepart( $path, $desc );
+
+            say "Upload: complete";
 
 # find the max upload rate and avoid overrunning
 # it here.
@@ -240,7 +238,7 @@ sub upload_paths
         or do
         {
             warn "Failed upload: $@";
-            warn "Aborting upload at: '$path' ($name)";
+            warn "Aborting upload at: '$path' ($vault)";
 
             last
         };

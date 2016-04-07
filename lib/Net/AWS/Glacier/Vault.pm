@@ -389,16 +389,10 @@ sub job_status
     state $api_op   = 'job';
 
     my $vault   = shift;
-    my $arg     = shift
+    my $job     = shift
     or croak "Bogus job_status: false job object/id";
 
-    my $job_id
-    = blessed $arg
-    ? $arg->job_id
-    : $arg
-    ;
-
-    $vault->call_api( $api_op => $job_id )
+    $vault->call_api( $api_op => "$job" )
 }
 
 sub describe

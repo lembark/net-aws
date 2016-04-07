@@ -7,7 +7,7 @@ use List::Util      qw( first   );
 use Scalar::Util    qw( reftype );
 
 use Test::More;
-use Test::GlacierUtil;
+use Test::Glacier::Vault;
 
 SKIP:
 {
@@ -15,53 +15,40 @@ SKIP:
     or skip "AWS_GLACIER_FULL not set", 1;
 
     my $name    = "test-net-aws-glacier";
+    my $vault   = $proto->new( $name );
 
-    my $vault
-    = eval
+    eval
     {
-        my $found   
-        = first 
-        {
-            $_->{ VaultName } eq $name
-        }
-        $glacier->list_vaults
+        $vault->exists
         or
-        $glacier->create_vault( $name )
-        or
-        die "Failed create vault: '$name' ($@_)";
-
-        $name
+        $vault->create
     }
     or BAIL_OUT "Error installing test vault: $@";
 
-    if( my $vault_data  = $glacier->describe_vault( $vault ) )
+    my @pathz   = glob 't/0*.t';
+
+    my %path2arch
+    = eval
     {
-        my @pathz   = glob 't/0*.t';
-        my %path2arch
-        = eval
-        {
-            $glacier->upload_paths( $name => @pathz );
-        };
+$DB::single = 1;
 
-        note "Upload results:\n", explain \%path2arch;
+        $vault->upload_paths( @pathz );
+    };
 
-        if( $@ )
-        {
-            fail "Upload paths: $@";
-        }
-        else
-        {
-            $path2arch{ $_ }
-            ? pass "Has archive id: '$_'"
-            : fail "Lacks archive id: '$_'"
-            for @pathz;
-        }
+    note "Upload results:\n", explain \%path2arch;
+
+    if( $@ )
+    {
+        fail "Upload paths: $@";
     }
     else
     {
-        fail "Vault '$vault' does not exist";
+        $path2arch{ $_ }
+        ? pass "Has archive id: '$_'"
+        : fail "Lacks archive id: '$_'"
+        for @pathz;
     }
-};
+}
 
 done_testing;
 
