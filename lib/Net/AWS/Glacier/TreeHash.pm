@@ -4,15 +4,16 @@
 package Net::AWS::Glacier::TreeHash;
 use v5.20;
 use autodie;
-use experimental qw( lexical_subs autoderef );
+use experimental qw( lexical_subs );
+
+use Keyword::TreeFold;
+use Keyword::Value;
 
 use Carp            qw( croak           );
 use Digest::SHA     qw( sha256          );
 use List::Util      qw( max             );
 use Scalar::Util    qw( reftype         );
 use Symbol          qw( qualify_to_ref  );
-
-use Net::AWS::Util::Const qw( const           );
 
 ########################################################################
 # package variables
@@ -25,92 +26,46 @@ $VERSION = eval $VERSION;
 # utility subs
 ########################################################################
 
-const my $reduce_hash =>
-sub
+tree_fold reduce_hash( $left, $rite )
 {
-    # iterate reducing the pairs of 1MiB data units to a single value.
-    # "2 > @_" intentionally returns undef for an empty list.
+    $rite
+    ? sha256 $left, $rite
+    : $left
+}
 
-    return $_[0]
-    if 2 > @_;
-
-    const my $chunks => ( @_ / 2 ) + ( @_ % 2 );
-
-    @_  
-    = map
-    {
-        const my $i => 2 * ( $_ - 1 );
-
-        sha256 @_[ $i .. max( $i+1, $#_) ]
-    }
-    ( 1 .. $chunks );
-
-    goto __SUB__
-};
-
-const my $buffer_hash =>
-sub
+sub buffer_hash
 {
     state $format   = '(a' . 2**20 . ')*';
-    const my $buffer => shift;
+
+    value $buffer   = shift;
 
     length $buffer
     or return;
 
-    $reduce_hash->
-    (
-        map
-        {
-            sha256 $_
-        }
-        unpack $format, $buffer
-    )
-};
-
-sub import
-{
-    const state $exportz =>
+    reduce_hash
+    map
     {
-        tree_hash       => \&tree_hash,
-        tree_hash_hex   => \&tree_hash_hex,
-        reduce_hash     => $reduce_hash,
-        buffer_hash     => $buffer_hash,
-    };
-
-    shift;
-
-    const my $caller    => caller;
-
-    for( @_ )
-    {
-        const my $ref   => $exportz->{ $_ };
-
-        *{ qualify_to_ref $_, $caller  } = $ref;
+        value sha256 $_
     }
-
-    return
+    unpack $format, $buffer
 }
-
-########################################################################
-# methods
-########################################################################
 
 sub tree_hash
 {
     @_ > 1
     and croak 'Bogus tree_hash: multiple arguments';
 
-    const my $type  => reftype $_[0];
+    value $type = reftype $_[0];
     
     # caller gets back buffer_hash, reduce_hash, or death.
 
     if( '' eq $type  )
     {
-        &$buffer_hash
+        &buffer_hash
     }
     elsif( 'ARRAY' eq $type )
     {
-        $reduce_hash->( values $_[0] )
+        reduce_hash values @{ $_[0] }
     }
     else
     {
@@ -121,6 +76,25 @@ sub tree_hash
 sub tree_hash_hex
 {
     unpack 'H*', &tree_hash
+}
+
+sub import
+{
+    # discard this package.
+
+    shift;
+
+    value $caller = caller;
+
+    for( @_ )
+    {
+        my $ref = __PACKAGE__->can( $_ )
+        or croak "Unknown function: '$_'";
+
+        *{ qualify_to_ref $_, $caller  } = $ref;
+    }
+
+    return
 }
 
 # keep require happy
