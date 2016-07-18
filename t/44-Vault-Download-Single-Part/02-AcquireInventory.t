@@ -10,7 +10,7 @@ use Scalar::Util    qw( reftype     );
 use Test::More;
 use Test::GlacierUtil;
 
-my $vault   = "test-glacier-module";
+my $vault   = "test-net-aws-glacier";
 my $tmpdir  = './tmp';
 my $base    = 'inventory.json';
 

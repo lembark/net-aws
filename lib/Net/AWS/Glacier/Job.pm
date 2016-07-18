@@ -87,7 +87,9 @@ sub data : lvalue
     or 
     croak "Bogus data: un-blessed job/false job_id";
 
-    $job_datz{ $id }
+    @_
+    ? $job_datz{ $id } = const shift
+    : $job_datz{ $id }
 }
 
 sub description
@@ -104,7 +106,7 @@ sub description
 
 for
 (
-    [ qw( type      Action          ) ],
+    [ qw( action    Action          ) ],
     [ qw( status    StatusCode      ) ],
     [ qw( complete  Completed       ) ],
     [ qw( message   StatusMessage   ) ],
@@ -187,25 +189,27 @@ sub initialize
 {
     my $job     = shift;
 
-    $_[0]
+    my $arg     = shift
     or croak 'Bogus initialize: false job input (stats/id)';
 
-    if( 'HASH' eq reftype $_[0] )
+    my $type    = reftype $arg;
+
+    if( 'HASH' eq $type )
     {
         # job_id data from listing.
         # install stats for the job_id.
 
-        my $statz   = shift;
-
-        %$statz
+        %$arg
         or croak "Bogus initialize: empty job data ($job)";
 
-        my $id   = $statz->{ JobId }
+        $$job   = $arg->{ JobId }
         or croak "Bogus job stats: false JobId.";
 
-        $$job       = $id;
-
-        $job->status( $statz );
+        $job->data( $arg );
+    }
+    elsif( $type )
+    {
+        croak 'Bogus initialize: non-hash reference argument';
     }
     else
     {
@@ -217,7 +221,7 @@ sub initialize
         $job->data  ||= { JobId => $id };
     }
 
-    $job
+    const $job
 }
 
 sub new
@@ -231,7 +235,7 @@ sub new
     # is sanitized to avoid JSON boolean objects, empty
     # elements.
 
-    const $job
+    $job
 }
 
 sub cleanup
@@ -281,14 +285,14 @@ Result of JSON::XS:
           'Marker' => undef
           'StartDate' => undef
        'InventorySizeInBytes' => 5235
-       'JobDescription' => 'Inventory test-glacier-module'
+       'JobDescription' => 'Inventory test-net-aws-glacier'
        'JobId' => 'E_vPiqEmVgLDP7mUUxvT8gAiCb3ai81PVFwlzHuyq-kFa2pQCxAX1NTlRmKElCkk5JGj0Ydi9fYhhvM7BqTuI8w0kijW'
        'RetrievalByteRange' => undef
        'SHA256TreeHash' => undef
        'SNSTopic' => undef
        'StatusCode' => 'Succeeded'
        'StatusMessage' => 'Succeeded'
-       'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-glacier-module'
+       'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-net-aws-glacier'
    };
 
 =item Object contents
@@ -313,9 +317,9 @@ A few items are munged:
        'InventoryRetrievalParameters' => HASH(0x3a0f858)
           'Format' => 'JSON'
        'InventorySizeInBytes' => 5235
-       'JobDescription' => 'Inventory test-glacier-module'
+       'JobDescription' => 'Inventory test-net-aws-glacier'
        'JobId' => 'E_vPiqEmVgLDP7mUUxvT8gAiCb3ai81PVFwlzHuyq-kFa2pQCxAX1NTlRmKElCkk5JGj0Ydi9fYhhvM7BqTuI8w0kijW'
        'StatusCode' => 'Succeeded'
        'StatusMessage' => 'Succeeded'
-       'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-glacier-module'
+       'VaultARN' => 'arn:aws:glacier:us-west-2:481917615240:vaults/test-net-aws-glacier'
    };

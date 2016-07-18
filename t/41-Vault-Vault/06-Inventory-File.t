@@ -12,7 +12,7 @@ use JSON::XS        qw( decode_json );
 use Test::More;
 use Test::Glacier::Vault;
 
-my $test_vault  = "test-glacier-module";
+my $test_vault  = "test-net-aws-glacier";
 
 SKIP:
 {
@@ -69,8 +69,6 @@ SKIP:
                     -d $tmp || mkdir $tmp
                     or BAIL_OUT "Failed mkdir: '$tmp', $!";
 
-$DB::single = 1;
-
                     my $path
                     = $vault->acquire_inventory
                     (
@@ -79,6 +77,8 @@ $DB::single = 1;
 
                     if( -e $path )
                     {
+$DB::single = 1;
+
                         -s _    or die "Zero-sized: '$vault' ($path)";
                         -r _    or die "Unreadable: '$vault' ($path)";
 

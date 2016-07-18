@@ -10,7 +10,7 @@ use Scalar::Util    qw( reftype );
 
 use Test::Glacier::API;
 
-my $vault   = "test-glacier-module";
+my $vault   = "test-net-aws-glacier";
 my $find
 = sub
 {

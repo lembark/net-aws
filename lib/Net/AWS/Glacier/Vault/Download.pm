@@ -207,7 +207,7 @@ sub download_avilable_job
         = @{ $_ }{ qw( JobId Action JobDescription ) };
 
         # note that there may be an existing false value due to 
-        # a failed $valut->$writer( ... ), below.
+        # a failed $vault->$writer( ... ), below.
 
         $seen->{ $job_id }
         and next;

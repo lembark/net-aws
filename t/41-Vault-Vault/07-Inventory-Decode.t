@@ -12,7 +12,7 @@ use JSON::XS        qw( decode_json );
 use Test::More;
 use Test::Glacier::Vault;
 
-my $test_vault  = "test-glacier-module";
+my $test_vault  = "test-net-aws-glacier";
 
 SKIP:
 {
